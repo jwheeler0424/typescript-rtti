@@ -20,3 +20,17 @@ _Phase 1 Scaffolding for Type Reflection & Metadata Extraction_
 3. Start developing in `/src`, `/tools`, `/lib`.
 
 See `NOTES.md` for full architecture and implementation instructions.
+
+## Commands For Testing
+
+```bash
+rm metadata.cache metadata.bin
+```
+
+```bash
+npx tsx tools/compiler.ts
+```
+
+```bash
+npx tsx tools/cli-introspect-demo.ts metadata.bin
+```

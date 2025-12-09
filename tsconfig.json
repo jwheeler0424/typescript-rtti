@@ -10,7 +10,7 @@
     "target": "esnext",
     // For nodejs:
     "lib": ["esnext"],
-    "types": ["node", "jest"],
+    "types": ["node", "jest", "./metadata.d.ts"],
 
     // Other Outputs
     "sourceMap": true,
@@ -36,6 +36,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "build", "dist"]
+  "include": ["src", "metadata.d.ts"],
+  "exclude": ["node_modules", "build", "dist", "tools", "lib"]
 }

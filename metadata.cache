@@ -1,0 +1,592 @@
+{
+  "version": 1,
+  "files": {
+    "src/Box.ts": {
+      "mtimeMs": 1765232403303.1616,
+      "typeHashes": {
+        "Box": "ff886952299108a6dba26e07d28f91dffb1d979c",
+        "wrap": "21cd12e118c9fbba79bc46b63b5c625abdd4ca6b"
+      },
+      "types": [
+        {
+          "fqName": "Box",
+          "kind": 4,
+          "data": {
+            "props": [
+              {
+                "name": "value",
+                "kind": "property",
+                "type": 9,
+                "flags": 0,
+                "decorators": []
+              },
+              {
+                "name": "meta",
+                "kind": "property",
+                "type": 9,
+                "flags": 0,
+                "decorators": []
+              }
+            ],
+            "generics": [
+              "T",
+              "U"
+            ],
+            "decorators": [],
+            "bases": []
+          }
+        },
+        {
+          "fqName": "wrap",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "val",
+                "type": 9,
+                "decorators": []
+              }
+            ],
+            "returnType": 9,
+            "generics": [
+              "T"
+            ],
+            "decorators": []
+          }
+        }
+      ]
+    },
+    "src/Demo.ts": {
+      "mtimeMs": 1765232941355.3389,
+      "typeHashes": {
+        "Demo": "5ec3673e6ec6d9bc97b0db851e08909087f853d5"
+      },
+      "types": [
+        {
+          "fqName": "Demo",
+          "kind": 4,
+          "data": {
+            "props": [
+              {
+                "name": "foo",
+                "kind": "property",
+                "type": 2,
+                "flags": 0,
+                "decorators": []
+              },
+              {
+                "name": "bar",
+                "kind": "property",
+                "type": 1,
+                "flags": 20,
+                "decorators": []
+              },
+              {
+                "name": "baz",
+                "kind": "property",
+                "type": 3,
+                "flags": 11,
+                "decorators": []
+              }
+            ],
+            "generics": [],
+            "decorators": [],
+            "bases": []
+          }
+        }
+      ]
+    },
+    "src/TestModel.ts": {
+      "mtimeMs": 1765318146013.3513,
+      "typeHashes": {
+        "Person": "812b80f6b836397f64428912cae3dfb506cbccbb",
+        "greet": "923ebf4f2626ba8c064930d32d1c09632a540872"
+      },
+      "types": [
+        {
+          "fqName": "Person",
+          "kind": 4,
+          "data": {
+            "props": [
+              {
+                "name": "name",
+                "kind": "property",
+                "type": 2,
+                "flags": 0,
+                "decorators": []
+              },
+              {
+                "name": "isActive",
+                "kind": "property",
+                "type": 3,
+                "flags": 0,
+                "decorators": []
+              },
+              {
+                "name": "constructor",
+                "kind": "constructor",
+                "type": 9,
+                "flags": 0,
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "id",
+                    "type": 1,
+                    "decorators": []
+                  },
+                  {
+                    "name": "name",
+                    "type": 2,
+                    "decorators": []
+                  },
+                  {
+                    "name": "isActive",
+                    "type": 3,
+                    "decorators": []
+                  }
+                ]
+              },
+              {
+                "name": "id",
+                "kind": "property",
+                "type": 1,
+                "flags": 8,
+                "decorators": []
+              }
+            ],
+            "generics": [],
+            "decorators": [],
+            "bases": []
+          }
+        },
+        {
+          "fqName": "greet",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "name",
+                "type": 2,
+                "decorators": []
+              }
+            ],
+            "returnType": 2,
+            "generics": [],
+            "decorators": []
+          }
+        }
+      ]
+    },
+    "src/TestTypes.ts": {
+      "mtimeMs": 1765317747657.178,
+      "typeHashes": {
+        "Keys": "45f42560c8b20a47e4a03f32b17744ecdb146cea",
+        "Mapped": "8c0a61f44832304841b5e6c093d4b85f91ce3e6d",
+        "Maybe": "e1c6f73e37fcdec8e20c4841d092c585a70560fa",
+        "Union": "53ea1b497914e2321e13150a32e94d9e62668252"
+      },
+      "types": [
+        {
+          "fqName": "Keys",
+          "kind": 7,
+          "data": {
+            "members": [
+              "\"a\"",
+              "\"b\""
+            ]
+          }
+        },
+        {
+          "fqName": "Mapped",
+          "kind": 11,
+          "data": {
+            "keyName": "K",
+            "keyConstraint": "Keys",
+            "valueType": "number"
+          }
+        },
+        {
+          "fqName": "Maybe",
+          "kind": 12,
+          "data": {
+            "checkType": "T",
+            "extendsType": "string",
+            "trueType": "string[]",
+            "falseType": "never"
+          }
+        },
+        {
+          "fqName": "Union",
+          "kind": 7,
+          "data": {
+            "members": [
+              "Mapped",
+              "Maybe<string>"
+            ]
+          }
+        }
+      ]
+    },
+    "src/User.ts": {
+      "mtimeMs": 1765228415712.4524,
+      "typeHashes": {
+        "User": "4ccd50fa42f0e1f9b487136ae9a5ea25332746f8"
+      },
+      "types": [
+        {
+          "fqName": "User",
+          "kind": 4,
+          "data": {
+            "props": [
+              {
+                "name": "id",
+                "kind": "property",
+                "type": 1,
+                "flags": 0,
+                "decorators": []
+              },
+              {
+                "name": "name",
+                "kind": "property",
+                "type": 2,
+                "flags": 0,
+                "decorators": []
+              },
+              {
+                "name": "email",
+                "kind": "property",
+                "type": 2,
+                "flags": 4,
+                "decorators": []
+              },
+              {
+                "name": "constructor",
+                "kind": "constructor",
+                "type": 9,
+                "flags": 0,
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "id",
+                    "type": 1,
+                    "decorators": []
+                  },
+                  {
+                    "name": "name",
+                    "type": 2,
+                    "decorators": []
+                  },
+                  {
+                    "name": "email",
+                    "type": 2,
+                    "decorators": []
+                  }
+                ]
+              }
+            ],
+            "generics": [],
+            "decorators": [],
+            "bases": []
+          }
+        }
+      ]
+    },
+    "src/index.ts": {
+      "mtimeMs": 1765228398762.5923,
+      "typeHashes": {},
+      "types": []
+    },
+    "src/lib/index.ts": {
+      "mtimeMs": 1764970438358.8137,
+      "typeHashes": {},
+      "types": []
+    }
+  },
+  "types": {
+    "Box": {
+      "fqName": "Box",
+      "hash": "ff886952299108a6dba26e07d28f91dffb1d979c",
+      "meta": {
+        "fqName": "Box",
+        "kind": 4,
+        "data": {
+          "props": [
+            {
+              "name": "value",
+              "kind": "property",
+              "type": 9,
+              "flags": 0,
+              "decorators": []
+            },
+            {
+              "name": "meta",
+              "kind": "property",
+              "type": 9,
+              "flags": 0,
+              "decorators": []
+            }
+          ],
+          "generics": [
+            "T",
+            "U"
+          ],
+          "decorators": [],
+          "bases": []
+        }
+      }
+    },
+    "wrap": {
+      "fqName": "wrap",
+      "hash": "21cd12e118c9fbba79bc46b63b5c625abdd4ca6b",
+      "meta": {
+        "fqName": "wrap",
+        "kind": 5,
+        "data": {
+          "params": [
+            {
+              "name": "val",
+              "type": 9,
+              "decorators": []
+            }
+          ],
+          "returnType": 9,
+          "generics": [
+            "T"
+          ],
+          "decorators": []
+        }
+      }
+    },
+    "Demo": {
+      "fqName": "Demo",
+      "hash": "5ec3673e6ec6d9bc97b0db851e08909087f853d5",
+      "meta": {
+        "fqName": "Demo",
+        "kind": 4,
+        "data": {
+          "props": [
+            {
+              "name": "foo",
+              "kind": "property",
+              "type": 2,
+              "flags": 0,
+              "decorators": []
+            },
+            {
+              "name": "bar",
+              "kind": "property",
+              "type": 1,
+              "flags": 20,
+              "decorators": []
+            },
+            {
+              "name": "baz",
+              "kind": "property",
+              "type": 3,
+              "flags": 11,
+              "decorators": []
+            }
+          ],
+          "generics": [],
+          "decorators": [],
+          "bases": []
+        }
+      }
+    },
+    "Person": {
+      "fqName": "Person",
+      "hash": "812b80f6b836397f64428912cae3dfb506cbccbb",
+      "meta": {
+        "fqName": "Person",
+        "kind": 4,
+        "data": {
+          "props": [
+            {
+              "name": "name",
+              "kind": "property",
+              "type": 2,
+              "flags": 0,
+              "decorators": []
+            },
+            {
+              "name": "isActive",
+              "kind": "property",
+              "type": 3,
+              "flags": 0,
+              "decorators": []
+            },
+            {
+              "name": "constructor",
+              "kind": "constructor",
+              "type": 9,
+              "flags": 0,
+              "decorators": [],
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": 1,
+                  "decorators": []
+                },
+                {
+                  "name": "name",
+                  "type": 2,
+                  "decorators": []
+                },
+                {
+                  "name": "isActive",
+                  "type": 3,
+                  "decorators": []
+                }
+              ]
+            },
+            {
+              "name": "id",
+              "kind": "property",
+              "type": 1,
+              "flags": 8,
+              "decorators": []
+            }
+          ],
+          "generics": [],
+          "decorators": [],
+          "bases": []
+        }
+      }
+    },
+    "greet": {
+      "fqName": "greet",
+      "hash": "923ebf4f2626ba8c064930d32d1c09632a540872",
+      "meta": {
+        "fqName": "greet",
+        "kind": 5,
+        "data": {
+          "params": [
+            {
+              "name": "name",
+              "type": 2,
+              "decorators": []
+            }
+          ],
+          "returnType": 2,
+          "generics": [],
+          "decorators": []
+        }
+      }
+    },
+    "Keys": {
+      "fqName": "Keys",
+      "hash": "45f42560c8b20a47e4a03f32b17744ecdb146cea",
+      "meta": {
+        "fqName": "Keys",
+        "kind": 7,
+        "data": {
+          "members": [
+            "\"a\"",
+            "\"b\""
+          ]
+        }
+      }
+    },
+    "Mapped": {
+      "fqName": "Mapped",
+      "hash": "8c0a61f44832304841b5e6c093d4b85f91ce3e6d",
+      "meta": {
+        "fqName": "Mapped",
+        "kind": 11,
+        "data": {
+          "keyName": "K",
+          "keyConstraint": "Keys",
+          "valueType": "number"
+        }
+      }
+    },
+    "Maybe": {
+      "fqName": "Maybe",
+      "hash": "e1c6f73e37fcdec8e20c4841d092c585a70560fa",
+      "meta": {
+        "fqName": "Maybe",
+        "kind": 12,
+        "data": {
+          "checkType": "T",
+          "extendsType": "string",
+          "trueType": "string[]",
+          "falseType": "never"
+        }
+      }
+    },
+    "Union": {
+      "fqName": "Union",
+      "hash": "53ea1b497914e2321e13150a32e94d9e62668252",
+      "meta": {
+        "fqName": "Union",
+        "kind": 7,
+        "data": {
+          "members": [
+            "Mapped",
+            "Maybe<string>"
+          ]
+        }
+      }
+    },
+    "User": {
+      "fqName": "User",
+      "hash": "4ccd50fa42f0e1f9b487136ae9a5ea25332746f8",
+      "meta": {
+        "fqName": "User",
+        "kind": 4,
+        "data": {
+          "props": [
+            {
+              "name": "id",
+              "kind": "property",
+              "type": 1,
+              "flags": 0,
+              "decorators": []
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "type": 2,
+              "flags": 0,
+              "decorators": []
+            },
+            {
+              "name": "email",
+              "kind": "property",
+              "type": 2,
+              "flags": 4,
+              "decorators": []
+            },
+            {
+              "name": "constructor",
+              "kind": "constructor",
+              "type": 9,
+              "flags": 0,
+              "decorators": [],
+              "parameters": [
+                {
+                  "name": "id",
+                  "type": 1,
+                  "decorators": []
+                },
+                {
+                  "name": "name",
+                  "type": 2,
+                  "decorators": []
+                },
+                {
+                  "name": "email",
+                  "type": 2,
+                  "decorators": []
+                }
+              ]
+            }
+          ],
+          "generics": [],
+          "decorators": [],
+          "bases": []
+        }
+      }
+    }
+  }
+}

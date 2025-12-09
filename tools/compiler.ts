@@ -1,9 +1,19 @@
+import { createHash } from "crypto";
 import fs from "fs";
 import lz4 from "lz4js";
 import path from "path";
 import ts from "typescript";
-import { OpCode, PrimitiveType } from "./protocol.js";
-import { RTTIMetadata, RTTISerializer } from "./serializer.js";
+import { OpCode, PrimitiveType } from "./protocol";
+import { RTTISerializer } from "./serializer";
+import type { MetadataCache, RTTIMetadata } from "./types";
+
+const CACHE_PATH = path.join(process.cwd(), "metadata.cache");
+const PROTOCOL_VERSION = 1;
+
+function hashType(meta: RTTIMetadata): string {
+  // For highest fidelity, sort & stringify the type shape
+  return createHash("sha1").update(JSON.stringify(meta)).digest("hex");
+}
 
 function getPrimitiveType(type: ts.Type): PrimitiveType {
   if (type.flags & ts.TypeFlags.Number) return PrimitiveType.Number;
@@ -230,17 +240,63 @@ function extractClassMetadata(
         decorators: [],
         parameters,
       });
+
+      for (const param of member.parameters) {
+        // Check for public/private/protected/readonly etc. modifiers
+        const isParameterProperty = param.modifiers?.some(
+          (m) =>
+            m.kind === ts.SyntaxKind.PrivateKeyword ||
+            m.kind === ts.SyntaxKind.ProtectedKeyword ||
+            m.kind === ts.SyntaxKind.PublicKeyword ||
+            m.kind === ts.SyntaxKind.ReadonlyKeyword
+        );
+        // Only add if not already present (avoid duplicates)
+        const pname = ts.isIdentifier(param.name)
+          ? param.name.text
+          : param.name.getText(sourceFile);
+        if (isParameterProperty && !props.some((p) => p.name === pname)) {
+          let flags = 0;
+          if (
+            param.modifiers?.some(
+              (m) => m.kind === ts.SyntaxKind.PrivateKeyword
+            )
+          )
+            flags |= 1 << 3;
+          else if (
+            param.modifiers?.some(
+              (m) => m.kind === ts.SyntaxKind.ProtectedKeyword
+            )
+          )
+            flags |= 1 << 4;
+          if (
+            param.modifiers?.some(
+              (m) => m.kind === ts.SyntaxKind.ReadonlyKeyword
+            )
+          )
+            flags |= 1 << 1;
+          let pType = PrimitiveType.Unknown;
+          if (param.type) {
+            const typeObj = typeChecker.getTypeFromTypeNode(param.type);
+            pType = getPrimitiveType(typeObj);
+          }
+          props.push({
+            name: pname,
+            kind: "property",
+            type: pType,
+            flags,
+            decorators: extractDecorators(
+              "decorators" in param ? (param as any).decorators : undefined,
+              sourceFile
+            ),
+          });
+        }
+      }
     }
   }
 
-  // ...extract generics and class decorators as previously
-
-  const generics: string[] = [];
-  if (node.typeParameters) {
-    node.typeParameters.forEach((tp) => {
-      generics.push(tp.name.text);
-    });
-  }
+  const generics: string[] = node.typeParameters
+    ? node.typeParameters.map((tp) => tp.name.text)
+    : [];
   const decorators = extractDecorators(
     "decorators" in node ? (node as any).decorators : undefined,
     sourceFile
@@ -284,12 +340,9 @@ function extractFunctionMetadata(
     returnType = getPrimitiveType(typeObj);
   }
   // Generics
-  const generics: string[] = [];
-  if (node.typeParameters) {
-    node.typeParameters.forEach((tp) => {
-      generics.push(tp.name.text);
-    });
-  }
+  const generics: string[] = node.typeParameters
+    ? node.typeParameters.map((tp) => tp.name.text)
+    : [];
 
   const decorators = extractDecorators(
     "decorators" in node ? (node as any).decorators : undefined,
@@ -300,36 +353,6 @@ function extractFunctionMetadata(
     kind: OpCode.REF_FUNCTION,
     data: { params, returnType, generics, decorators },
   };
-}
-
-function extractTypeNode(
-  typeNode: ts.TypeNode,
-  sourceFile: ts.SourceFile,
-  serializer: RTTISerializer
-) {
-  if (ts.isUnionTypeNode(typeNode)) {
-    // For union in top-level type alias, emit as named union
-    const fqName = fqNameFromNode(typeNode.parent, sourceFile);
-    const memberNames: string[] = typeNode.types.map((t) =>
-      t.getText(sourceFile)
-    );
-    serializer.addType({
-      fqName,
-      kind: OpCode.REF_UNION,
-      data: { members: memberNames },
-    });
-  }
-  if (ts.isIntersectionTypeNode(typeNode)) {
-    const fqName = fqNameFromNode(typeNode.parent, sourceFile);
-    const memberNames: string[] = typeNode.types.map((t) =>
-      t.getText(sourceFile)
-    );
-    serializer.addType({
-      fqName,
-      kind: OpCode.REF_INTERSECTION,
-      data: { members: memberNames },
-    });
-  }
 }
 
 function extractDecorators(
@@ -351,6 +374,18 @@ function extractDecorators(
 }
 
 async function main(): Promise<void> {
+  // --- Load or initialize cache
+  let cache: MetadataCache = fs.existsSync(CACHE_PATH)
+    ? JSON.parse(fs.readFileSync(CACHE_PATH, "utf-8"))
+    : { version: PROTOCOL_VERSION, files: {}, types: {} };
+
+  // Invalidate cache if protocol upgrades
+  if (!cache.version || cache.version !== PROTOCOL_VERSION) {
+    console.warn(
+      `Protocol version mismatch (found ${cache.version}, expected ${PROTOCOL_VERSION}). Rebuilding cache.`
+    );
+    cache = { version: PROTOCOL_VERSION, files: {}, types: {} };
+  }
   const configPath = ts.findConfigFile(
     "./",
     ts.sys.fileExists,
@@ -365,16 +400,29 @@ async function main(): Promise<void> {
   );
   const program = ts.createProgram(parsed.fileNames, parsed.options);
   const typeChecker = program.getTypeChecker();
-  const serializer = new RTTISerializer();
+
+  // --- Track RTTI from all sources for final serialization
+  let allTypes: RTTIMetadata[] = [];
+
+  // --- Gather all source files present this run
+  const presentFiles = new Set<string>();
 
   for (const sourceFile of program.getSourceFiles()) {
     if (sourceFile.fileName.includes("node_modules")) continue;
+    presentFiles.add(sourceFile.fileName);
+
+    const stat = fs.statSync(sourceFile.fileName);
+    const prevFileEntry = cache.files[sourceFile.fileName];
+
+    let typesForThisFile: RTTIMetadata[] = [];
+    let typeHashes: Record<string, string> = {};
     ts.forEachChild(sourceFile, (node) => {
+      let meta: RTTIMetadata | undefined;
       // === INTERFACE EXTRACTION ===
       if (ts.isInterfaceDeclaration(node) && node.name) {
         const fqName = fqNameFromNode(node, sourceFile);
 
-        // Extract "extends" interfaces
+        // Extract 'extends' (heritage)
         const bases: string[] = [];
         if (node.heritageClauses) {
           for (const hc of node.heritageClauses) {
@@ -386,25 +434,108 @@ async function main(): Promise<void> {
           }
         }
 
-        // You may want to extract properties/methods/decorators here as well.
+        // Extract properties and methods
+        const props: {
+          name: string;
+          kind: "property" | "method";
+          type: PrimitiveType;
+          flags: number;
+          decorators: { name: string; args: string[] }[];
+          parameters?: {
+            name: string;
+            type: PrimitiveType;
+            decorators: { name: string; args: string[] }[];
+          }[];
+        }[] = [];
+        for (const member of node.members) {
+          // Properties: PropertySignature
+          if (
+            ts.isPropertySignature(member) &&
+            member.name &&
+            ts.isIdentifier(member.name)
+          ) {
+            const name = member.name.text;
+            const typeObj = member.type
+              ? typeChecker.getTypeFromTypeNode(member.type)
+              : typeChecker.getTypeAtLocation(member);
+            let flags = 0;
+            if ("questionToken" in member && member.questionToken)
+              flags |= 1 << 2; // optional
+            props.push({
+              name,
+              kind: "property",
+              type: getPrimitiveType(typeObj),
+              flags,
+              decorators: extractDecorators(
+                (member as any).decorators,
+                sourceFile
+              ),
+            });
+          }
+          // Methods: MethodSignature
+          if (
+            ts.isMethodSignature(member) &&
+            member.name &&
+            ts.isIdentifier(member.name)
+          ) {
+            const name = member.name.text;
+            const parameters = member.parameters.map((param) => {
+              const pname = param.name.getText(sourceFile);
+              let pType = PrimitiveType.Unknown;
+              if (param.type) {
+                const typeObj = typeChecker.getTypeFromTypeNode(param.type);
+                pType = getPrimitiveType(typeObj);
+              }
+              return {
+                name: pname,
+                type: pType,
+                decorators: extractDecorators(
+                  (param as any).decorators,
+                  sourceFile
+                ),
+              };
+            });
+            props.push({
+              name,
+              kind: "method",
+              type: PrimitiveType.Unknown, // you may enhance to use method return type if desired
+              flags: 0,
+              decorators: extractDecorators(
+                (member as any).decorators,
+                sourceFile
+              ),
+              parameters,
+            });
+          }
+          // (No accessors or constructors in interfaces)
+        }
 
-        serializer.addType({
+        // Generics
+        const generics: string[] = node.typeParameters
+          ? node.typeParameters.map((tp) => tp.name.text)
+          : [];
+
+        // Decorators (rare on interfaces, but possible with TS plugin support)
+        const decorators = extractDecorators(
+          (node as any).decorators,
+          sourceFile
+        );
+
+        meta = {
           fqName,
-          kind: OpCode.REF_OBJECT, // Or REF_INTERFACE if you have a separate OpCode
-          data: { bases },
-        });
+          kind: OpCode.REF_OBJECT, // Still using REF_OBJECT for interfaces
+          data: { props, generics, decorators, bases },
+        };
       }
 
       // === CLASS EXTRACTION ===
       if (ts.isClassDeclaration(node) && node.name) {
-        const meta = extractClassMetadata(node, typeChecker, sourceFile);
-        serializer.addType(meta);
+        meta = extractClassMetadata(node, typeChecker, sourceFile);
       }
 
       // === FUNCTION EXTRACTION ===
       if (ts.isFunctionDeclaration(node) && node.name) {
-        const meta = extractFunctionMetadata(node, typeChecker, sourceFile);
-        serializer.addType(meta);
+        meta = extractFunctionMetadata(node, typeChecker, sourceFile);
       }
 
       // === ENUM EXTRACTION ===
@@ -425,36 +556,129 @@ async function main(): Promise<void> {
           }
           members.push({ name, value });
         });
-        serializer.addType({
+        meta = {
           fqName,
           kind: OpCode.REF_ENUM,
           data: { members },
-        });
+        };
       }
 
       if (ts.isTypeAliasDeclaration(node)) {
         // This handles cases like: type Foo = Bar | Baz;
-        if (
-          ts.isUnionTypeNode(node.type) ||
-          ts.isIntersectionTypeNode(node.type)
-        ) {
-          extractTypeNode(node.type, sourceFile, serializer);
+        if (ts.isUnionTypeNode(node.type)) {
+          // For union in top-level type alias, emit as named union
+          const fqName = fqNameFromNode(node.type.parent, sourceFile);
+          const memberNames: string[] = node.type.types.map((t) =>
+            t.getText(sourceFile)
+          );
+          meta = {
+            fqName,
+            kind: OpCode.REF_UNION,
+            data: { members: memberNames },
+          };
+        }
+        if (ts.isIntersectionTypeNode(node.type)) {
+          const fqName = fqNameFromNode(node.type.parent, sourceFile);
+          const memberNames: string[] = node.type.types.map((t) =>
+            t.getText(sourceFile)
+          );
+          meta = {
+            fqName,
+            kind: OpCode.REF_INTERSECTION,
+            data: { members: memberNames },
+          };
+        }
+
+        if (ts.isMappedTypeNode(node.type)) {
+          const fqName = node.name.text;
+          const typeParameter = node.type.typeParameter;
+          const keyName = typeParameter.name.getText(sourceFile);
+          const keyConstraint =
+            typeParameter.constraint?.getText(sourceFile) ?? ""; // <----- patch!
+          const valueType = node.type.type
+            ? node.type.type.getText(sourceFile)
+            : "";
+
+          meta = {
+            fqName,
+            kind: OpCode.REF_MAPPED,
+            data: {
+              keyName,
+              keyConstraint,
+              valueType,
+            },
+          };
+        }
+
+        if (ts.isConditionalTypeNode(node.type)) {
+          const fqName = node.name.text;
+          // Example: type Maybe<T> = T extends string ? string[] : never
+          const checkType = node.type.checkType.getText(sourceFile);
+          const extendsType = node.type.extendsType.getText(sourceFile);
+          const trueType = node.type.trueType.getText(sourceFile);
+          const falseType = node.type.falseType.getText(sourceFile);
+          meta = {
+            fqName,
+            kind: OpCode.REF_CONDITIONAL,
+            data: {
+              checkType,
+              extendsType,
+              trueType,
+              falseType,
+            },
+          };
+        }
+      }
+
+      if (meta) {
+        const fqName = meta.fqName;
+        const typeHash = hashType(meta);
+
+        // Compare to cached value (regardless of file mtime):
+        const cachedType = cache.types[fqName];
+        if (cachedType && cachedType.hash === typeHash) {
+          // Use cached RTTIMetadata
+          typesForThisFile.push(cachedType.meta);
+          typeHashes[fqName] = typeHash;
+        } else {
+          // New/changed type, update global type cache
+          cache.types[fqName] = { fqName, hash: typeHash, meta };
+          typesForThisFile.push(meta);
+          typeHashes[fqName] = typeHash;
         }
       }
     });
+
+    // Update file cache entry
+    cache.files[sourceFile.fileName] = {
+      mtimeMs: stat.mtimeMs,
+      typeHashes,
+      types: typesForThisFile,
+    };
+    allTypes.push(...typesForThisFile);
   }
 
+  // Prune orphaned types in cache.types (optional, for deleted types)
+  const usedTypes = new Set(allTypes.map((t) => t.fqName));
+  for (const fqName of Object.keys(cache.types)) {
+    if (!usedTypes.has(fqName)) delete cache.types[fqName];
+  }
+
+  // --- Serialize combined RTTI
+  const serializer = new RTTISerializer();
+  for (const meta of allTypes) {
+    console.log(`SERIALIZE: ${meta.fqName}`, (meta.data as any).generics ?? "");
+    serializer.addType(meta);
+  }
   const { stringTableBuffer, indexBuffer, heapBuffer } =
     serializer.buildBinarySections();
-
-  // Compress the heap buffer using lz4js (pure JS, cross platform)
   const compressedHeapBuffer = Buffer.from(
     lz4.compress(Uint8Array.from(heapBuffer))
   );
 
   const headerBuffer = Buffer.alloc(32);
   headerBuffer.writeUInt32LE(0x4d455441, 0);
-  headerBuffer.writeUInt16LE(1, 4);
+  headerBuffer.writeUInt16LE(PROTOCOL_VERSION, 4);
   headerBuffer.writeUInt16LE(0x0001, 6);
   headerBuffer.writeUInt32LE(stringTableBuffer.length, 8);
   headerBuffer.writeUInt32LE(indexBuffer.length, 12);
@@ -467,9 +691,12 @@ async function main(): Promise<void> {
     indexBuffer,
     compressedHeapBuffer,
   ]);
+  cache.version = PROTOCOL_VERSION;
   await fs.promises.writeFile(path.join(process.cwd(), "metadata.bin"), out);
+  fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
+
   console.log(
-    `metadata.bin written. Entries: ${serializer.index.length}, Compressed heap bytes: ${compressedHeapBuffer.length}`
+    `Incremental build: metadata.bin written (${serializer.index.length} entries, ${compressedHeapBuffer.length} bytes).`
   );
 }
 

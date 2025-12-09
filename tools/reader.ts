@@ -1,6 +1,7 @@
 import fs from "fs";
 import lz4 from "lz4js";
-import { IndexEntry } from "../tools/protocol.js";
+import { decodeRTTIEntry } from "./decoder";
+import { IndexEntry } from "./protocol";
 
 export interface MetadataHeader {
   magic: number;
@@ -18,7 +19,7 @@ export class MetadataStore {
   private header!: MetadataHeader;
   private strings: string[] = [];
   private index: IndexEntry[] = [];
-  private heap: Buffer = Buffer.alloc(0);
+  private heap: Uint8Array = new Uint8Array(0);
 
   async load(filePath: string): Promise<void> {
     const buf = fs.readFileSync(filePath);
@@ -30,7 +31,6 @@ export class MetadataStore {
       indexTableSize: buf.readUInt32LE(12),
       heapSize: buf.readUInt32LE(16),
     };
-
     let offset = 32;
     const stringTableBuf = buf.subarray(
       offset,
@@ -41,10 +41,8 @@ export class MetadataStore {
     offset += this.header.indexTableSize;
     const compressedHeap = buf.subarray(offset, offset + this.header.heapSize);
 
-    // Decompress heap section
-    this.heap = Buffer.from(lz4.decompress(Uint8Array.from(compressedHeap)));
+    this.heap = lz4.decompress(Uint8Array.from(compressedHeap));
 
-    // Parse string table (null-terminated)
     let pos = 0;
     while (pos < stringTableBuf.length) {
       let end = stringTableBuf.indexOf(0, pos);
@@ -53,7 +51,6 @@ export class MetadataStore {
       pos = end + 1;
     }
 
-    // Parse index entries
     const entrySize = 24;
     for (let i = 0; i < indexBuf.length; i += entrySize) {
       this.index.push({
@@ -75,11 +72,18 @@ export class MetadataStore {
     return this.index.find((e) => e.hash === hash);
   }
 
-  getMetadataBuffer(entry: IndexEntry): Buffer {
+  getMetadataBuffer(entry: IndexEntry): Uint8Array {
     return this.heap.subarray(
       entry.dataOffset,
       entry.dataOffset + entry.dataLength
     );
+  }
+
+  getDecodedEntryByName(name: string): any | undefined {
+    const entry = this.getEntryByName(name);
+    if (!entry) return undefined;
+    const buf = this.getMetadataBuffer(entry);
+    return decodeRTTIEntry(buf, (idx) => this.getStrings()[idx]);
   }
 
   listTypes(): string[] {
@@ -88,17 +92,7 @@ export class MetadataStore {
     );
   }
 
-  /**
-   * Getter for string table (for external reflection).
-   */
   getStrings(): string[] {
     return this.strings;
   }
 }
-
-// Example usage for testing
-// (async () => {
-//   const store = new MetadataStore();
-//   await store.load("metadata.bin");
-//   console.log("Loaded types:", store.listTypes());
-// })();

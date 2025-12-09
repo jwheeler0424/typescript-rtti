@@ -15,6 +15,8 @@ export enum OpCode {
   REF_INTERSECTION = 8,
   REF_ENUM = 9,
   REF_LITERAL = 10,
+  REF_MAPPED = 11,
+  REF_CONDITIONAL = 12,
 }
 
 export enum PrimitiveType {
@@ -88,6 +90,22 @@ export function encodeVarint(num: number): Uint8Array {
   }
   arr.push(num);
   return Uint8Array.from(arr);
+}
+
+export function decodeVarint(
+  buf: Uint8Array,
+  offset: number
+): { value: number; next: number } {
+  let value = 0,
+    shift = 0,
+    next = offset;
+  while (true) {
+    const b = buf[next++];
+    value |= (b & 0x7f) << shift;
+    if ((b & 0x80) === 0) break;
+    shift += 7;
+  }
+  return { value, next };
 }
 
 export function hasFeature(bitmap: number, featureMask: number): boolean {

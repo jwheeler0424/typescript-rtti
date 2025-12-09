@@ -1,6 +1,6 @@
 import fs from "fs";
 import lz4 from "lz4js";
-import { OpCode } from "./protocol.js"; // Modern ESM import
+import { decodeRTTIEntry } from "./decoder";
 
 function decodeHeader(buf: Buffer) {
   return {
@@ -20,7 +20,6 @@ async function main(): Promise<void> {
     console.error(`File not found: ${file}`);
     process.exit(1);
   }
-
   const buf = fs.readFileSync(file);
 
   // Parse protocol header
@@ -36,7 +35,7 @@ async function main(): Promise<void> {
   console.log(`Index table bytes: ${header.indexTableSize}`);
   console.log(`Compressed heap bytes: ${header.heapSize}`);
 
-  // Parse sidecar sections using Buffer.subarray (Node v20+ safe)
+  // Parse sidecar sections
   let offset = 32;
   const stringTableBuf = buf.subarray(offset, offset + header.stringTableSize);
   offset += header.stringTableSize;
@@ -44,10 +43,8 @@ async function main(): Promise<void> {
   offset += header.indexTableSize;
   const compressedHeapBuf = buf.subarray(offset, offset + header.heapSize);
 
-  // Decompress heap with lz4js (pure JS, cross platform)
-  const heapBuf = Buffer.from(
-    lz4.decompress(Uint8Array.from(compressedHeapBuf))
-  );
+  // Decompress heap
+  const heapBuf = lz4.decompress(Uint8Array.from(compressedHeapBuf));
 
   // Decode string table: null-terminated UTF-8 strings
   const strings: string[] = [];
@@ -80,13 +77,13 @@ async function main(): Promise<void> {
 
   // Print all RTTI entries with decoded kind from decompressed heap
   console.log(`Discovered ${typeEntries.length} entries:`);
-  typeEntries.forEach((entry, idx) => {
-    const kind = heapBuf.readUInt8(entry.dataOffset);
-    entry.kind = kind;
-    const kindName = OpCode[kind] ?? "Unknown";
-    console.log(
-      `[${idx}] ${entry.fqName} : ${kindName} (offset: ${entry.dataOffset}, len: ${entry.dataLength})`
+  typeEntries.forEach((entry) => {
+    const buf = heapBuf.slice(
+      entry.dataOffset,
+      entry.dataOffset + entry.dataLength
     );
+    const decoded = decodeRTTIEntry(buf, (idx) => strings[idx]);
+    console.log(`[${entry.fqName}]:`, JSON.stringify(decoded, null, 2));
   });
 
   console.log("Done.");

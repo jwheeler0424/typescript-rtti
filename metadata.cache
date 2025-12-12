@@ -57,11 +57,28 @@
       ]
     },
     "src/Demo.ts": {
-      "mtimeMs": 1765232941355.3389,
+      "mtimeMs": 1765497894672.9507,
       "typeHashes": {
-        "Demo": "5ec3673e6ec6d9bc97b0db851e08909087f853d5"
+        "dec": "441910d0a9c6c087967d75be3baeaae05d31726f",
+        "Demo": "4e441e56301b46c380eae227b4ae4e26f40c1d36"
       },
       "types": [
+        {
+          "fqName": "dec",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "args",
+                "type": 9,
+                "decorators": []
+              }
+            ],
+            "returnType": 9,
+            "generics": [],
+            "decorators": []
+          }
+        },
         {
           "fqName": "Demo",
           "kind": 4,
@@ -69,10 +86,22 @@
             "props": [
               {
                 "name": "foo",
-                "kind": "property",
-                "type": 2,
+                "kind": "method",
+                "type": 9,
                 "flags": 0,
-                "decorators": []
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "x",
+                    "type": 2,
+                    "decorators": []
+                  },
+                  {
+                    "name": "y",
+                    "type": 1,
+                    "decorators": []
+                  }
+                ]
               },
               {
                 "name": "bar",
@@ -96,11 +125,123 @@
         }
       ]
     },
+    "src/Overloads.ts": {
+      "mtimeMs": 1765498551867.0105,
+      "typeHashes": {
+        "wrap": "4e608dbe03be49cc51cab79588dcb31e813a9d5a",
+        "DemoOverload": "f15df3b559f7e9c2a513841b2bdc4c0ffd73408e"
+      },
+      "types": [
+        {
+          "fqName": "wrap",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "a",
+                "type": 2,
+                "decorators": []
+              }
+            ],
+            "returnType": 1,
+            "generics": [],
+            "decorators": []
+          }
+        },
+        {
+          "fqName": "wrap",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "a",
+                "type": 1,
+                "decorators": []
+              }
+            ],
+            "returnType": 2,
+            "generics": [],
+            "decorators": []
+          }
+        },
+        {
+          "fqName": "wrap",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "a",
+                "type": 8,
+                "decorators": []
+              }
+            ],
+            "returnType": 8,
+            "generics": [],
+            "decorators": []
+          }
+        },
+        {
+          "fqName": "DemoOverload",
+          "kind": 4,
+          "data": {
+            "props": [
+              {
+                "name": "foo",
+                "kind": "method",
+                "type": 9,
+                "flags": 0,
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "a",
+                    "type": 2,
+                    "decorators": []
+                  }
+                ]
+              },
+              {
+                "name": "foo",
+                "kind": "method",
+                "type": 9,
+                "flags": 0,
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "a",
+                    "type": 1,
+                    "decorators": []
+                  }
+                ]
+              },
+              {
+                "name": "foo",
+                "kind": "method",
+                "type": 9,
+                "flags": 0,
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "a",
+                    "type": 8,
+                    "decorators": []
+                  }
+                ]
+              }
+            ],
+            "generics": [],
+            "decorators": [],
+            "bases": []
+          }
+        }
+      ]
+    },
     "src/TestModel.ts": {
-      "mtimeMs": 1765318146013.3513,
+      "mtimeMs": 1765496985795.0242,
       "typeHashes": {
         "Person": "812b80f6b836397f64428912cae3dfb506cbccbb",
-        "greet": "923ebf4f2626ba8c064930d32d1c09632a540872"
+        "greet": "923ebf4f2626ba8c064930d32d1c09632a540872",
+        "dec": "441910d0a9c6c087967d75be3baeaae05d31726f",
+        "Demo": "459b26ada0fde16d9ebda8cd09da4047ea560360"
       },
       "types": [
         {
@@ -174,6 +315,52 @@
             "generics": [],
             "decorators": []
           }
+        },
+        {
+          "fqName": "dec",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "args",
+                "type": 9,
+                "decorators": []
+              }
+            ],
+            "returnType": 9,
+            "generics": [],
+            "decorators": []
+          }
+        },
+        {
+          "fqName": "Demo",
+          "kind": 4,
+          "data": {
+            "props": [
+              {
+                "name": "methodA",
+                "kind": "method",
+                "type": 9,
+                "flags": 0,
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "x",
+                    "type": 2,
+                    "decorators": []
+                  },
+                  {
+                    "name": "y",
+                    "type": 1,
+                    "decorators": []
+                  }
+                ]
+              }
+            ],
+            "generics": [],
+            "decorators": [],
+            "bases": []
+          }
         }
       ]
     },
@@ -228,11 +415,81 @@
       ]
     },
     "src/User.ts": {
-      "mtimeMs": 1765228415712.4524,
+      "mtimeMs": 1765497753886.184,
       "typeHashes": {
-        "User": "4ccd50fa42f0e1f9b487136ae9a5ea25332746f8"
+        "entity": "bd32b7e351b4400515de90dd6e196491386c11f4",
+        "field": "86f90e0f5a97b62c46e954a1ecaac9ebe74c8c21",
+        "log": "2419380a56670fc4816cae9d698646e2b9cb068e",
+        "inject": "a778fe13cd86907086b2ef455eaf2be6b03bdcc1",
+        "User": "92700a05d37001cc3284d1cae32c58ece3d2d147"
       },
       "types": [
+        {
+          "fqName": "entity",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "target",
+                "type": 9,
+                "decorators": []
+              }
+            ],
+            "returnType": 9,
+            "generics": [
+              "T"
+            ],
+            "decorators": []
+          }
+        },
+        {
+          "fqName": "field",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "meta",
+                "type": 8,
+                "decorators": []
+              }
+            ],
+            "returnType": 9,
+            "generics": [],
+            "decorators": []
+          }
+        },
+        {
+          "fqName": "log",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "args",
+                "type": 9,
+                "decorators": []
+              }
+            ],
+            "returnType": 9,
+            "generics": [],
+            "decorators": []
+          }
+        },
+        {
+          "fqName": "inject",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "key",
+                "type": 2,
+                "decorators": []
+              }
+            ],
+            "returnType": 9,
+            "generics": [],
+            "decorators": []
+          }
+        },
         {
           "fqName": "User",
           "kind": 4,
@@ -241,7 +498,7 @@
               {
                 "name": "id",
                 "kind": "property",
-                "type": 1,
+                "type": 2,
                 "flags": 0,
                 "decorators": []
               },
@@ -268,7 +525,7 @@
                 "parameters": [
                   {
                     "name": "id",
-                    "type": 1,
+                    "type": 2,
                     "decorators": []
                   },
                   {
@@ -278,6 +535,20 @@
                   },
                   {
                     "name": "email",
+                    "type": 2,
+                    "decorators": []
+                  }
+                ]
+              },
+              {
+                "name": "save",
+                "kind": "method",
+                "type": 9,
+                "flags": 0,
+                "decorators": [],
+                "parameters": [
+                  {
+                    "name": "id",
                     "type": 2,
                     "decorators": []
                   }
@@ -337,54 +608,127 @@
     },
     "wrap": {
       "fqName": "wrap",
-      "hash": "21cd12e118c9fbba79bc46b63b5c625abdd4ca6b",
+      "hash": "4e608dbe03be49cc51cab79588dcb31e813a9d5a",
       "meta": {
         "fqName": "wrap",
         "kind": 5,
         "data": {
           "params": [
             {
-              "name": "val",
+              "name": "a",
+              "type": 8,
+              "decorators": []
+            }
+          ],
+          "returnType": 8,
+          "generics": [],
+          "decorators": []
+        }
+      }
+    },
+    "dec": {
+      "fqName": "dec",
+      "hash": "441910d0a9c6c087967d75be3baeaae05d31726f",
+      "meta": {
+        "fqName": "dec",
+        "kind": 5,
+        "data": {
+          "params": [
+            {
+              "name": "args",
               "type": 9,
               "decorators": []
             }
           ],
           "returnType": 9,
-          "generics": [
-            "T"
-          ],
+          "generics": [],
           "decorators": []
         }
       }
     },
     "Demo": {
       "fqName": "Demo",
-      "hash": "5ec3673e6ec6d9bc97b0db851e08909087f853d5",
+      "hash": "459b26ada0fde16d9ebda8cd09da4047ea560360",
       "meta": {
         "fqName": "Demo",
         "kind": 4,
         "data": {
           "props": [
             {
-              "name": "foo",
-              "kind": "property",
-              "type": 2,
+              "name": "methodA",
+              "kind": "method",
+              "type": 9,
               "flags": 0,
-              "decorators": []
+              "decorators": [],
+              "parameters": [
+                {
+                  "name": "x",
+                  "type": 2,
+                  "decorators": []
+                },
+                {
+                  "name": "y",
+                  "type": 1,
+                  "decorators": []
+                }
+              ]
+            }
+          ],
+          "generics": [],
+          "decorators": [],
+          "bases": []
+        }
+      }
+    },
+    "DemoOverload": {
+      "fqName": "DemoOverload",
+      "hash": "f15df3b559f7e9c2a513841b2bdc4c0ffd73408e",
+      "meta": {
+        "fqName": "DemoOverload",
+        "kind": 4,
+        "data": {
+          "props": [
+            {
+              "name": "foo",
+              "kind": "method",
+              "type": 9,
+              "flags": 0,
+              "decorators": [],
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": 2,
+                  "decorators": []
+                }
+              ]
             },
             {
-              "name": "bar",
-              "kind": "property",
-              "type": 1,
-              "flags": 20,
-              "decorators": []
+              "name": "foo",
+              "kind": "method",
+              "type": 9,
+              "flags": 0,
+              "decorators": [],
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": 1,
+                  "decorators": []
+                }
+              ]
             },
             {
-              "name": "baz",
-              "kind": "property",
-              "type": 3,
-              "flags": 11,
-              "decorators": []
+              "name": "foo",
+              "kind": "method",
+              "type": 9,
+              "flags": 0,
+              "decorators": [],
+              "parameters": [
+                {
+                  "name": "a",
+                  "type": 8,
+                  "decorators": []
+                }
+              ]
             }
           ],
           "generics": [],
@@ -528,9 +872,91 @@
         }
       }
     },
+    "entity": {
+      "fqName": "entity",
+      "hash": "bd32b7e351b4400515de90dd6e196491386c11f4",
+      "meta": {
+        "fqName": "entity",
+        "kind": 5,
+        "data": {
+          "params": [
+            {
+              "name": "target",
+              "type": 9,
+              "decorators": []
+            }
+          ],
+          "returnType": 9,
+          "generics": [
+            "T"
+          ],
+          "decorators": []
+        }
+      }
+    },
+    "field": {
+      "fqName": "field",
+      "hash": "86f90e0f5a97b62c46e954a1ecaac9ebe74c8c21",
+      "meta": {
+        "fqName": "field",
+        "kind": 5,
+        "data": {
+          "params": [
+            {
+              "name": "meta",
+              "type": 8,
+              "decorators": []
+            }
+          ],
+          "returnType": 9,
+          "generics": [],
+          "decorators": []
+        }
+      }
+    },
+    "log": {
+      "fqName": "log",
+      "hash": "2419380a56670fc4816cae9d698646e2b9cb068e",
+      "meta": {
+        "fqName": "log",
+        "kind": 5,
+        "data": {
+          "params": [
+            {
+              "name": "args",
+              "type": 9,
+              "decorators": []
+            }
+          ],
+          "returnType": 9,
+          "generics": [],
+          "decorators": []
+        }
+      }
+    },
+    "inject": {
+      "fqName": "inject",
+      "hash": "a778fe13cd86907086b2ef455eaf2be6b03bdcc1",
+      "meta": {
+        "fqName": "inject",
+        "kind": 5,
+        "data": {
+          "params": [
+            {
+              "name": "key",
+              "type": 2,
+              "decorators": []
+            }
+          ],
+          "returnType": 9,
+          "generics": [],
+          "decorators": []
+        }
+      }
+    },
     "User": {
       "fqName": "User",
-      "hash": "4ccd50fa42f0e1f9b487136ae9a5ea25332746f8",
+      "hash": "92700a05d37001cc3284d1cae32c58ece3d2d147",
       "meta": {
         "fqName": "User",
         "kind": 4,
@@ -539,7 +965,7 @@
             {
               "name": "id",
               "kind": "property",
-              "type": 1,
+              "type": 2,
               "flags": 0,
               "decorators": []
             },
@@ -566,7 +992,7 @@
               "parameters": [
                 {
                   "name": "id",
-                  "type": 1,
+                  "type": 2,
                   "decorators": []
                 },
                 {
@@ -576,6 +1002,20 @@
                 },
                 {
                   "name": "email",
+                  "type": 2,
+                  "decorators": []
+                }
+              ]
+            },
+            {
+              "name": "save",
+              "kind": "method",
+              "type": 9,
+              "flags": 0,
+              "decorators": [],
+              "parameters": [
+                {
+                  "name": "id",
                   "type": 2,
                   "decorators": []
                 }

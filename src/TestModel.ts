@@ -12,3 +12,9 @@ export class Person {
 export function greet(name: string): string {
   return `Hello, ${name}!`;
 }
+
+function dec(...args: any[]) {}
+
+class Demo {
+  @dec methodA(@dec x: string, @dec y: number) {}
+}

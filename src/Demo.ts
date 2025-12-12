@@ -1,5 +1,7 @@
+function dec(...args: any[]) {}
+
 class Demo {
-  public foo: string;
+  @dec foo(x: string, y: number) {}
   protected bar?: number;
   private static readonly baz: boolean;
 }

@@ -97,12 +97,20 @@ function extractClassMetadata(
       )
         flags |= 1 << 4;
 
+      // TODO: extract property decorators
+      const propDecorators: RTTIDecorator[] = [];
+      member.forEachChild((child) => {
+        if (ts.isDecorator(child)) {
+          const decorator = extractDecorator(child, sourceFile);
+          if (decorator) propDecorators.push(decorator);
+        }
+      });
       props.push({
         name,
         kind: "property",
         type: getPrimitive(typeObj),
         flags,
-        decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
+        decorators: propDecorators,
       });
     }
 
@@ -133,21 +141,36 @@ function extractClassMetadata(
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
           pType = getPrimitive(typeObj);
         }
+        // TODO: extract parameter decorators
+        const parameterDecorators: RTTIDecorator[] = [];
+        param.forEachChild((child) => {
+          if (ts.isDecorator(child)) {
+            const decorator = extractDecorator(child, sourceFile);
+            if (decorator) parameterDecorators.push(decorator);
+          }
+        });
         return {
           name: pname,
           type: pType,
-          decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
+          decorators: parameterDecorators,
         };
       });
 
       // Special: get return type for methods if required. Here just storing params.
-
+      // TODO extract method decorators
+      const methodDecorators: RTTIDecorator[] = [];
+      member.forEachChild((child) => {
+        if (ts.isDecorator(child)) {
+          const decorator = extractDecorator(child, sourceFile);
+          if (decorator) methodDecorators.push(decorator);
+        }
+      });
       props.push({
         name,
         kind: "method",
         type: Primitive.Unknown, // Optionally use the actual return type
         flags,
-        decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
+        decorators: methodDecorators,
         parameters,
       });
     }
@@ -177,19 +200,34 @@ function extractClassMetadata(
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
           pType = getPrimitive(typeObj);
         }
+        // TODO: extract parameter decorators
+        const parameterDecorators: RTTIDecorator[] = [];
+        param.forEachChild((child) => {
+          if (ts.isDecorator(child)) {
+            const decorator = extractDecorator(child, sourceFile);
+            if (decorator) parameterDecorators.push(decorator);
+          }
+        });
         return {
           name: pname,
           type: pType,
-          decorators: extractDecorators(param.getChildren() ?? [], sourceFile),
+          decorators: parameterDecorators,
         };
       });
-
+      // TODO: extract property decorators
+      const propDecorators: RTTIDecorator[] = [];
+      member.forEachChild((child) => {
+        if (ts.isDecorator(child)) {
+          const decorator = extractDecorator(child, sourceFile);
+          if (decorator) propDecorators.push(decorator);
+        }
+      });
       props.push({
         name,
         kind: "accessor",
         type: Primitive.Unknown,
         flags,
-        decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
+        decorators: propDecorators,
         parameters,
       });
     }
@@ -203,10 +241,18 @@ function extractClassMetadata(
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
           pType = getPrimitive(typeObj);
         }
+        // TODO: extract parameter decorators
+        const parameterDecorators: RTTIDecorator[] = [];
+        param.forEachChild((child) => {
+          if (ts.isDecorator(child)) {
+            const decorator = extractDecorator(child, sourceFile);
+            if (decorator) parameterDecorators.push(decorator);
+          }
+        });
         return {
           name: pname,
           type: pType,
-          decorators: extractDecorators(param.getChildren() ?? [], sourceFile),
+          decorators: parameterDecorators,
         };
       });
 
@@ -257,15 +303,20 @@ function extractClassMetadata(
             const typeObj = typeChecker.getTypeFromTypeNode(param.type);
             pType = getPrimitive(typeObj);
           }
+          // TODO: extract property decorators
+          const propDecorators: RTTIDecorator[] = [];
+          member.forEachChild((child) => {
+            if (ts.isDecorator(child)) {
+              const decorator = extractDecorator(child, sourceFile);
+              if (decorator) propDecorators.push(decorator);
+            }
+          });
           props.push({
             name: pname,
             kind: "property",
             type: pType,
             flags,
-            decorators: extractDecorators(
-              param.getChildren() ?? [],
-              sourceFile
-            ),
+            decorators: propDecorators,
           });
         }
       }
@@ -275,7 +326,14 @@ function extractClassMetadata(
   const generics: string[] = node.typeParameters
     ? node.typeParameters.map((tp) => tp.name.text)
     : [];
-  const decorators = extractDecorators(node.getChildren() ?? [], sourceFile);
+  // TODO: extract class decorators
+  const decorators: RTTIDecorator[] = [];
+  node.forEachChild((child) => {
+    if (ts.isDecorator(child)) {
+      const decorator = extractDecorator(child, sourceFile);
+      if (decorator) decorators.push(decorator);
+    }
+  });
   return {
     fqName,
     kind: OpCode.REF_CLASS,
@@ -298,10 +356,7 @@ function extractFunctionMetadata(
       const typeObj = typeChecker.getTypeFromTypeNode(param.type);
       pType = getPrimitive(typeObj);
     }
-    const paramDecorators = extractDecorators(
-      "decorators" in param ? (param as any).decorators : undefined,
-      sourceFile
-    );
+    const paramDecorators: RTTIDecorator[] = [];
     params.push({ name, type: pType, decorators: paramDecorators });
   });
   // Return type
@@ -315,38 +370,39 @@ function extractFunctionMetadata(
     ? node.typeParameters.map((tp) => tp.name.text)
     : [];
 
-  const decorators = extractDecorators(
-    "decorators" in node ? (node as any).decorators : undefined,
-    sourceFile
-  );
+  // TODO: extract function decorators
+  const decorators: RTTIDecorator[] = [];
+  node.forEachChild((child) => {
+    if (ts.isDecorator(child)) {
+      const decorator = extractDecorator(child, sourceFile);
+      if (decorator) decorators.push(decorator);
+    }
+  });
   return {
     fqName,
     kind: OpCode.REF_FUNCTION,
-    data: { params, returnType, generics },
+    data: { params, returnType, generics, decorators },
   };
 }
 
-function extractDecorators(
-  nodes: readonly ts.Node[] | undefined,
+function extractDecorator(
+  node: ts.Node | undefined,
   sourceFile: ts.SourceFile
-): { name: string; args: string[] }[] {
-  if (!nodes || nodes.length === 0) return [];
-  const decos: RTTIDecorator[] = [];
-  nodes.forEach((node) => {
-    if (ts.isDecorator(node)) {
-      let name = "",
-        args: string[] = [];
-      const expression = node.expression;
-      if (ts.isCallExpression(expression)) {
-        name = expression.expression.getText(sourceFile);
-        args = expression.arguments.map((arg) => arg.getText(sourceFile));
-      } else {
-        name = node.expression.getText(sourceFile);
-      }
-      decos.push({ name, args });
+): RTTIDecorator | undefined {
+  if (node && ts.isDecorator(node)) {
+    let name = "",
+      args: string[] = [];
+    const expression = node.expression;
+    if (ts.isCallExpression(expression)) {
+      name = expression.expression.getText(sourceFile);
+      args = expression.arguments.map((arg) => arg.getText(sourceFile));
+    } else {
+      name = node.expression.getText(sourceFile);
     }
-  });
-  return decos;
+    return { name, args };
+  }
+
+  return undefined;
 }
 
 async function main(): Promise<void> {
@@ -426,15 +482,15 @@ async function main(): Promise<void> {
             let flags = 0;
             if ("questionToken" in member && member.questionToken)
               flags |= 1 << 2; // optional
+
+            // TODO: extract property decorators
+            const propDecorators: RTTIDecorator[] = [];
             props.push({
               name,
               kind: "property",
               type: getPrimitive(typeObj),
               flags,
-              decorators: extractDecorators(
-                (member as any).decorators,
-                sourceFile
-              ),
+              decorators: propDecorators,
             });
           }
           // Methods: MethodSignature
@@ -451,24 +507,25 @@ async function main(): Promise<void> {
                 const typeObj = typeChecker.getTypeFromTypeNode(param.type);
                 pType = getPrimitive(typeObj);
               }
+
+              // TODO: extract parameter decorators
+              const paramDecorators: RTTIDecorator[] = [];
+
               return {
                 name: pname,
                 type: pType,
-                decorators: extractDecorators(
-                  (param as any).decorators,
-                  sourceFile
-                ),
+                decorators: paramDecorators,
               };
             });
+
+            // TODO: extract method decorators
+            const methodDecorators: RTTIDecorator[] = [];
             props.push({
               name,
               kind: "method",
               type: Primitive.Unknown, // you may enhance to use method return type if desired
               flags: 0,
-              decorators: extractDecorators(
-                (member as any).decorators,
-                sourceFile
-              ),
+              decorators: methodDecorators,
               parameters,
             });
           }
@@ -481,10 +538,8 @@ async function main(): Promise<void> {
           : [];
 
         // Decorators (rare on interfaces, but possible with TS plugin support)
-        const decorators = extractDecorators(
-          (node as any).decorators,
-          sourceFile
-        );
+        // TODO: extract interface decorators
+        const decorators: RTTIDecorator[] = [];
 
         meta = {
           fqName,

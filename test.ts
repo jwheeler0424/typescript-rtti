@@ -33,25 +33,25 @@ function walk(node: ts.Node) {
     console.log("class at", ts.SyntaxKind[node.kind], node.name?.getText(sf));
     node.forEachChild((childNode) => walkChildren(childNode, node));
   }
-  if (ts.isMethodDeclaration(node)) {
-    console.log("method at", ts.SyntaxKind[node.kind], node.name?.getText(sf));
-    node.forEachChild((childNode) => walkChildren(childNode, node));
-  }
-  if (ts.isPropertyDeclaration(node)) {
-    console.log(
-      "property at",
-      ts.SyntaxKind[node.kind],
-      node.name?.getText(sf)
-    );
-    node.forEachChild((childNode) => walkChildren(childNode, node));
-  }
-  if (ts.isDecorator(node)) {
-    console.log("decorators at", ts.SyntaxKind[node.kind], node.getText(sf));
-    console.log({ node });
-    node.forEachChild((childNode) => walkChildren(childNode, node));
-  }
+  // if (ts.isMethodDeclaration(node)) {
+  //   console.log("method at", ts.SyntaxKind[node.kind], node.name?.getText(sf));
+  //   node.forEachChild((childNode) => walkChildren(childNode, node));
+  // }
+  // if (ts.isPropertyDeclaration(node)) {
+  //   console.log(
+  //     "property at",
+  //     ts.SyntaxKind[node.kind],
+  //     node.name?.getText(sf)
+  //   );
+  //   node.forEachChild((childNode) => walkChildren(childNode, node));
+  // }
+  // if (ts.isDecorator(node)) {
+  //   console.log("decorators at", ts.SyntaxKind[node.kind], node.getText(sf));
+  //   console.log({ node });
+  //   node.forEachChild((childNode) => walkChildren(childNode, node));
+  // }
   node.forEachChild(walk);
-  const children = node.getChildren();
+  // const children = node.getChildren();
 }
 
 walk(sf);

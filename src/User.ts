@@ -16,7 +16,7 @@ class User {
   name: string;
   email?: string;
 
-  constructor(id: string, name: string, email?: string) {
+  constructor(@inject id: string, name: string, email?: string) {
     this.id = id;
     this.name = name;
     this.email = email;
@@ -27,6 +27,9 @@ class User {
     // example method logic
   }
 }
+
+@log
+function unused() {}
 
 // Export (optional, for the test runner)
 export { User };

@@ -5,7 +5,7 @@
       "mtimeMs": 1765645285289.8406,
       "typeHashes": {
         "Box": "3e6c2efc8c75033f4c37678abe946ef28b753a59",
-        "wrap": "572617819ed4208c74e9752c62e4d2b4e74c9f16"
+        "wrap": "a1935e66379bfe0559e5d97a8d7c99aabc36161c"
       },
       "types": [
         {
@@ -50,7 +50,8 @@
             "returnType": 2,
             "generics": [
               "T"
-            ]
+            ],
+            "decorators": []
           }
         }
       ]
@@ -58,8 +59,8 @@
     "src/Demo.ts": {
       "mtimeMs": 1765645285290.937,
       "typeHashes": {
-        "dec": "9bb932f58c9c66f8bb07f19fd9b2aacd861ebc15",
-        "Demo": "c8cb99a8243f67ea83eadc908449daf7aae9da6e"
+        "dec": "5ad65cb471241991439ecb1b1bfb5a6fdc6405ba",
+        "Demo": "3229bc7f25b32efb7639d423bb0eaa81c3907079"
       },
       "types": [
         {
@@ -74,7 +75,8 @@
               }
             ],
             "returnType": 2,
-            "generics": []
+            "generics": [],
+            "decorators": []
           }
         },
         {
@@ -87,7 +89,12 @@
                 "kind": "method",
                 "type": 2,
                 "flags": 0,
-                "decorators": [],
+                "decorators": [
+                  {
+                    "name": "dec",
+                    "args": []
+                  }
+                ],
                 "parameters": [
                   {
                     "name": "x",
@@ -126,7 +133,7 @@
     "src/Overloads.ts": {
       "mtimeMs": 1765645285292.1443,
       "typeHashes": {
-        "wrap": "fa105a55bdbe9fa18feb58a8f47f55dba45c4fcc",
+        "wrap": "bba890f831211f3aabbfdb6b6b99013b69ffe436",
         "DemoOverload": "7f500f40b8bbcd552df5fa103c8d66ec3e140d30"
       },
       "types": [
@@ -142,7 +149,8 @@
               }
             ],
             "returnType": 8,
-            "generics": []
+            "generics": [],
+            "decorators": []
           }
         },
         {
@@ -157,7 +165,8 @@
               }
             ],
             "returnType": 4,
-            "generics": []
+            "generics": [],
+            "decorators": []
           }
         },
         {
@@ -172,7 +181,8 @@
               }
             ],
             "returnType": 1,
-            "generics": []
+            "generics": [],
+            "decorators": []
           }
         },
         {
@@ -281,13 +291,14 @@
       ]
     },
     "src/User.ts": {
-      "mtimeMs": 1765660255825.4495,
+      "mtimeMs": 1765669851917.5579,
       "typeHashes": {
-        "entity": "c17d771076209dab6c0a56fd2a93d16860f24008",
-        "field": "0e276602273c81bfea09fbf6f4e36eca8788d120",
-        "log": "346947bef66f8e0934029d22f71e3ce663d489a7",
-        "inject": "46d1090e53662a74365708e1676fc1e0e12fd7c9",
-        "User": "1796da3767c7b06e6575384866dd6e8efd70fc71"
+        "entity": "a6c87150da0ca1443900352182f01620aeac1360",
+        "field": "9122f770037baf94d287e26d088774c7c1b33dde",
+        "log": "366cfcb53f3a8a2831dee4378c560283f6f0afa4",
+        "inject": "37a10d775f827dea56359c85e496fc2f95c6a2ab",
+        "User": "5536cb7fa364345eacf0da4c6839654c392adb45",
+        "unused": "2c749c223a9536668cf6a76db0586bf275aaa8b3"
       },
       "types": [
         {
@@ -304,7 +315,8 @@
             "returnType": 2,
             "generics": [
               "T"
-            ]
+            ],
+            "decorators": []
           }
         },
         {
@@ -319,7 +331,8 @@
               }
             ],
             "returnType": 2,
-            "generics": []
+            "generics": [],
+            "decorators": []
           }
         },
         {
@@ -334,7 +347,8 @@
               }
             ],
             "returnType": 2,
-            "generics": []
+            "generics": [],
+            "decorators": []
           }
         },
         {
@@ -349,7 +363,8 @@
               }
             ],
             "returnType": 2,
-            "generics": []
+            "generics": [],
+            "decorators": []
           }
         },
         {
@@ -362,7 +377,18 @@
                 "kind": "property",
                 "type": 4,
                 "flags": 0,
-                "decorators": []
+                "decorators": [
+                  {
+                    "name": "log",
+                    "args": []
+                  },
+                  {
+                    "name": "field",
+                    "args": [
+                      "{ type: \"id\" }"
+                    ]
+                  }
+                ]
               },
               {
                 "name": "name",
@@ -388,7 +414,12 @@
                   {
                     "name": "id",
                     "type": 4,
-                    "decorators": []
+                    "decorators": [
+                      {
+                        "name": "inject",
+                        "args": []
+                      }
+                    ]
                   },
                   {
                     "name": "name",
@@ -407,7 +438,12 @@
                 "kind": "method",
                 "type": 2,
                 "flags": 0,
-                "decorators": [],
+                "decorators": [
+                  {
+                    "name": "log",
+                    "args": []
+                  }
+                ],
                 "parameters": [
                   {
                     "name": "id",
@@ -418,8 +454,28 @@
               }
             ],
             "generics": [],
-            "decorators": [],
+            "decorators": [
+              {
+                "name": "entity",
+                "args": []
+              }
+            ],
             "bases": []
+          }
+        },
+        {
+          "fqName": "unused",
+          "kind": 5,
+          "data": {
+            "params": [],
+            "returnType": 2,
+            "generics": [],
+            "decorators": [
+              {
+                "name": "log",
+                "args": []
+              }
+            ]
           }
         }
       ]
@@ -470,7 +526,7 @@
     },
     "wrap": {
       "fqName": "wrap",
-      "hash": "fa105a55bdbe9fa18feb58a8f47f55dba45c4fcc",
+      "hash": "bba890f831211f3aabbfdb6b6b99013b69ffe436",
       "meta": {
         "fqName": "wrap",
         "kind": 5,
@@ -483,13 +539,14 @@
             }
           ],
           "returnType": 1,
-          "generics": []
+          "generics": [],
+          "decorators": []
         }
       }
     },
     "dec": {
       "fqName": "dec",
-      "hash": "9bb932f58c9c66f8bb07f19fd9b2aacd861ebc15",
+      "hash": "5ad65cb471241991439ecb1b1bfb5a6fdc6405ba",
       "meta": {
         "fqName": "dec",
         "kind": 5,
@@ -502,13 +559,14 @@
             }
           ],
           "returnType": 2,
-          "generics": []
+          "generics": [],
+          "decorators": []
         }
       }
     },
     "Demo": {
       "fqName": "Demo",
-      "hash": "c8cb99a8243f67ea83eadc908449daf7aae9da6e",
+      "hash": "3229bc7f25b32efb7639d423bb0eaa81c3907079",
       "meta": {
         "fqName": "Demo",
         "kind": 4,
@@ -519,7 +577,12 @@
               "kind": "method",
               "type": 2,
               "flags": 0,
-              "decorators": [],
+              "decorators": [
+                {
+                  "name": "dec",
+                  "args": []
+                }
+              ],
               "parameters": [
                 {
                   "name": "x",
@@ -668,7 +731,7 @@
     },
     "entity": {
       "fqName": "entity",
-      "hash": "c17d771076209dab6c0a56fd2a93d16860f24008",
+      "hash": "a6c87150da0ca1443900352182f01620aeac1360",
       "meta": {
         "fqName": "entity",
         "kind": 5,
@@ -683,13 +746,14 @@
           "returnType": 2,
           "generics": [
             "T"
-          ]
+          ],
+          "decorators": []
         }
       }
     },
     "field": {
       "fqName": "field",
-      "hash": "0e276602273c81bfea09fbf6f4e36eca8788d120",
+      "hash": "9122f770037baf94d287e26d088774c7c1b33dde",
       "meta": {
         "fqName": "field",
         "kind": 5,
@@ -702,13 +766,14 @@
             }
           ],
           "returnType": 2,
-          "generics": []
+          "generics": [],
+          "decorators": []
         }
       }
     },
     "log": {
       "fqName": "log",
-      "hash": "346947bef66f8e0934029d22f71e3ce663d489a7",
+      "hash": "366cfcb53f3a8a2831dee4378c560283f6f0afa4",
       "meta": {
         "fqName": "log",
         "kind": 5,
@@ -721,13 +786,14 @@
             }
           ],
           "returnType": 2,
-          "generics": []
+          "generics": [],
+          "decorators": []
         }
       }
     },
     "inject": {
       "fqName": "inject",
-      "hash": "46d1090e53662a74365708e1676fc1e0e12fd7c9",
+      "hash": "37a10d775f827dea56359c85e496fc2f95c6a2ab",
       "meta": {
         "fqName": "inject",
         "kind": 5,
@@ -740,13 +806,14 @@
             }
           ],
           "returnType": 2,
-          "generics": []
+          "generics": [],
+          "decorators": []
         }
       }
     },
     "User": {
       "fqName": "User",
-      "hash": "1796da3767c7b06e6575384866dd6e8efd70fc71",
+      "hash": "5536cb7fa364345eacf0da4c6839654c392adb45",
       "meta": {
         "fqName": "User",
         "kind": 4,
@@ -757,7 +824,18 @@
               "kind": "property",
               "type": 4,
               "flags": 0,
-              "decorators": []
+              "decorators": [
+                {
+                  "name": "log",
+                  "args": []
+                },
+                {
+                  "name": "field",
+                  "args": [
+                    "{ type: \"id\" }"
+                  ]
+                }
+              ]
             },
             {
               "name": "name",
@@ -783,7 +861,12 @@
                 {
                   "name": "id",
                   "type": 4,
-                  "decorators": []
+                  "decorators": [
+                    {
+                      "name": "inject",
+                      "args": []
+                    }
+                  ]
                 },
                 {
                   "name": "name",
@@ -802,7 +885,12 @@
               "kind": "method",
               "type": 2,
               "flags": 0,
-              "decorators": [],
+              "decorators": [
+                {
+                  "name": "log",
+                  "args": []
+                }
+              ],
               "parameters": [
                 {
                   "name": "id",
@@ -813,8 +901,32 @@
             }
           ],
           "generics": [],
-          "decorators": [],
+          "decorators": [
+            {
+              "name": "entity",
+              "args": []
+            }
+          ],
           "bases": []
+        }
+      }
+    },
+    "unused": {
+      "fqName": "unused",
+      "hash": "2c749c223a9536668cf6a76db0586bf275aaa8b3",
+      "meta": {
+        "fqName": "unused",
+        "kind": 5,
+        "data": {
+          "params": [],
+          "returnType": 2,
+          "generics": [],
+          "decorators": [
+            {
+              "name": "log",
+              "args": []
+            }
+          ]
         }
       }
     }

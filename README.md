@@ -32,5 +32,5 @@ npx tsx tools/compiler.ts
 ```
 
 ```bash
-npx tsx tools/cli-introspect-demo.ts metadata.bin
+npx tsx tools/cli.ts metadata.bin
 ```

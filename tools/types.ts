@@ -1,42 +1,78 @@
 import { OpCode, PrimitiveType } from "./protocol";
 
+export interface RTTIDecorator {
+  name: string;
+  args: string[];
+}
+
+export interface RTTIParameter {
+  name: string;
+  type: PrimitiveType; // PrimitiveType | OtherKind
+  decorators: RTTIDecorator[];
+}
+
+export interface RTTIFunction {
+  params: RTTIParameter[];
+  returnType: PrimitiveType;
+  generics?: string[];
+}
+
+export interface RTTIMethodOverload {
+  params: RTTIParameter[];
+  returnType: PrimitiveType;
+  decorators: RTTIDecorator[];
+}
+
+export interface RTTIMethodImplementation {
+  params: RTTIParameter[];
+  returnType: PrimitiveType;
+  decorators: RTTIDecorator[];
+}
+
+export interface RTTIPropInfo {
+  name: string;
+  type: PrimitiveType;
+  flags: number;
+  decorators: RTTIDecorator[];
+  kind?: "property" | "method" | "accessor" | "constructor";
+  overloads?: RTTIMethodOverload[];
+  implementation?: RTTIMethodImplementation;
+}
+
 // For classes and objects
 export interface RTTIClassMetadata {
   fqName: string;
   kind: OpCode.REF_CLASS | OpCode.REF_OBJECT;
   data: {
-    props: Array<{
-      name: string;
-      kind: "property" | "method" | "accessor" | "constructor";
-      type: PrimitiveType;
-      flags: number;
-      decorators: { name: string; args: string[] }[];
-      parameters?: Array<{
-        name: string;
-        type: PrimitiveType;
-        decorators: { name: string; args: string[] }[];
-      }>;
-    }>;
+    props: Array<RTTIPropInfo>;
     generics: string[];
-    decorators: { name: string; args: string[] }[];
+    decorators: RTTIDecorator[];
     bases: string[];
   };
+}
+
+export interface RTTIMethodOverload {
+  params: RTTIParameter[];
+  returnType: PrimitiveType;
+  decorators: RTTIDecorator[];
+}
+
+export interface RTTIClassMethodProp {
+  name: string;
+  kind: "method";
+  type: PrimitiveType; // main implementation's return type (optional)
+  flags: number;
+  overloads: RTTIMethodOverload[];
+  implementation?: RTTIMethodOverload;
+  decorators: RTTIDecorator[];
+  parameters?: RTTIParameter[];
 }
 
 // For functions
 export interface RTTIFunctionMetadata {
   fqName: string;
   kind: OpCode.REF_FUNCTION;
-  data: {
-    params: Array<{
-      name: string;
-      type: PrimitiveType;
-      decorators: { name: string; args: string[] }[];
-    }>;
-    returnType: PrimitiveType;
-    generics: string[];
-    decorators: { name: string; args: string[] }[];
-  };
+  data: RTTIFunction;
 }
 
 // For primitive type

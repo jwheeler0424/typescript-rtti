@@ -351,7 +351,7 @@ function extractFunctionMetadata(
   return {
     fqName,
     kind: OpCode.REF_FUNCTION,
-    data: { params, returnType, generics, decorators },
+    data: { params, returnType, generics },
   };
 }
 

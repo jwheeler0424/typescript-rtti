@@ -9,6 +9,7 @@ function inject(key: string) {
 
 @entity
 class User {
+  @log
   @field({ type: "id" })
   id: string;
 

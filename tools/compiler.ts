@@ -3,9 +3,16 @@ import fs from "fs";
 import lz4 from "lz4js";
 import path from "path";
 import ts from "typescript";
-import { OpCode, PrimitiveType } from "./protocol";
+import { OpCode, Primitive } from "./protocol";
 import { RTTISerializer } from "./serializer";
-import type { MetadataCache, RTTIMetadata } from "./types";
+import type {
+  MetadataCache,
+  PrimitiveType,
+  RTTIDecorator,
+  RTTIMetadata,
+  RTTIParameter,
+  RTTIPropInfo,
+} from "./types";
 
 const CACHE_PATH = path.join(process.cwd(), "metadata.cache");
 const PROTOCOL_VERSION = 1;
@@ -15,16 +22,16 @@ function hashType(meta: RTTIMetadata): string {
   return createHash("sha1").update(JSON.stringify(meta)).digest("hex");
 }
 
-function getPrimitiveType(type: ts.Type): PrimitiveType {
-  if (type.flags & ts.TypeFlags.Number) return PrimitiveType.Number;
-  if (type.flags & ts.TypeFlags.String) return PrimitiveType.String;
-  if (type.flags & ts.TypeFlags.Boolean) return PrimitiveType.Boolean;
-  if (type.flags & ts.TypeFlags.BigInt) return PrimitiveType.BigInt;
-  if (type.flags & ts.TypeFlags.Null) return PrimitiveType.Null;
-  if (type.flags & ts.TypeFlags.Undefined) return PrimitiveType.Undefined;
-  if (type.flags & ts.TypeFlags.Any) return PrimitiveType.Any;
-  if (type.flags & ts.TypeFlags.Unknown) return PrimitiveType.Unknown;
-  return PrimitiveType.Unknown;
+function getPrimitive(type: ts.Type): PrimitiveType {
+  if (type.flags & ts.TypeFlags.Number) return Primitive.Number;
+  if (type.flags & ts.TypeFlags.String) return Primitive.String;
+  if (type.flags & ts.TypeFlags.Boolean) return Primitive.Boolean;
+  if (type.flags & ts.TypeFlags.BigInt) return Primitive.BigInt;
+  if (type.flags & ts.TypeFlags.Null) return Primitive.Null;
+  if (type.flags & ts.TypeFlags.Undefined) return Primitive.Undefined;
+  if (type.flags & ts.TypeFlags.Any) return Primitive.Any;
+  if (type.flags & ts.TypeFlags.Unknown) return Primitive.Unknown;
+  return Primitive.Unknown;
 }
 
 function fqNameFromNode(node: ts.Node, sourceFile: ts.SourceFile): string {
@@ -45,18 +52,7 @@ function extractClassMetadata(
   sourceFile: ts.SourceFile
 ): RTTIMetadata {
   const fqName = fqNameFromNode(node, sourceFile);
-  const props: {
-    name: string;
-    kind: "property" | "method" | "accessor" | "constructor";
-    type: PrimitiveType;
-    flags: number;
-    decorators: { name: string; args: string[] }[];
-    parameters?: {
-      name: string;
-      type: PrimitiveType;
-      decorators: { name: string; args: string[] }[];
-    }[];
-  }[] = [];
+  const props: RTTIPropInfo[] = [];
 
   // Extract Implements
   const bases: string[] = [];
@@ -104,12 +100,9 @@ function extractClassMetadata(
       props.push({
         name,
         kind: "property",
-        type: getPrimitiveType(typeObj),
+        type: getPrimitive(typeObj),
         flags,
-        decorators: extractDecorators(
-          "decorators" in member ? (member as any).decorators : undefined,
-          sourceFile
-        ),
+        decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
       });
     }
 
@@ -135,18 +128,15 @@ function extractClassMetadata(
       // Extract method parameters
       const parameters = member.parameters.map((param) => {
         const pname = param.name.getText(sourceFile);
-        let pType = PrimitiveType.Unknown;
+        let pType: PrimitiveType = Primitive.Unknown;
         if (param.type) {
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-          pType = getPrimitiveType(typeObj);
+          pType = getPrimitive(typeObj);
         }
         return {
           name: pname,
           type: pType,
-          decorators: extractDecorators(
-            "decorators" in param ? (param as any).decorators : undefined,
-            sourceFile
-          ),
+          decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
         };
       });
 
@@ -155,12 +145,9 @@ function extractClassMetadata(
       props.push({
         name,
         kind: "method",
-        type: PrimitiveType.Unknown, // Optionally use the actual return type
+        type: Primitive.Unknown, // Optionally use the actual return type
         flags,
-        decorators: extractDecorators(
-          "decorators" in member ? (member as any).decorators : undefined,
-          sourceFile
-        ),
+        decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
         parameters,
       });
     }
@@ -185,30 +172,24 @@ function extractClassMetadata(
       // Accessor params for setters
       const parameters = member.parameters?.map((param) => {
         const pname = param.name.getText(sourceFile);
-        let pType = PrimitiveType.Unknown;
+        let pType = Primitive.Unknown;
         if (param.type) {
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-          pType = getPrimitiveType(typeObj);
+          pType = getPrimitive(typeObj);
         }
         return {
           name: pname,
           type: pType,
-          decorators: extractDecorators(
-            "decorators" in param ? (param as any).decorators : undefined,
-            sourceFile
-          ),
+          decorators: extractDecorators(param.getChildren() ?? [], sourceFile),
         };
       });
 
       props.push({
         name,
         kind: "accessor",
-        type: PrimitiveType.Unknown,
+        type: Primitive.Unknown,
         flags,
-        decorators: extractDecorators(
-          "decorators" in member ? (member as any).decorators : undefined,
-          sourceFile
-        ),
+        decorators: extractDecorators(member.getChildren() ?? [], sourceFile),
         parameters,
       });
     }
@@ -217,25 +198,22 @@ function extractClassMetadata(
     if (ts.isConstructorDeclaration(member)) {
       const parameters = member.parameters.map((param) => {
         const pname = param.name.getText(sourceFile);
-        let pType = PrimitiveType.Unknown;
+        let pType = Primitive.Unknown;
         if (param.type) {
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-          pType = getPrimitiveType(typeObj);
+          pType = getPrimitive(typeObj);
         }
         return {
           name: pname,
           type: pType,
-          decorators: extractDecorators(
-            "decorators" in param ? (param as any).decorators : undefined,
-            sourceFile
-          ),
+          decorators: extractDecorators(param.getChildren() ?? [], sourceFile),
         };
       });
 
       props.push({
         name: "constructor",
         kind: "constructor",
-        type: PrimitiveType.Unknown,
+        type: Primitive.Unknown,
         flags: 0,
         decorators: [],
         parameters,
@@ -274,10 +252,10 @@ function extractClassMetadata(
             )
           )
             flags |= 1 << 1;
-          let pType = PrimitiveType.Unknown;
+          let pType = Primitive.Unknown;
           if (param.type) {
             const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-            pType = getPrimitiveType(typeObj);
+            pType = getPrimitive(typeObj);
           }
           props.push({
             name: pname,
@@ -285,7 +263,7 @@ function extractClassMetadata(
             type: pType,
             flags,
             decorators: extractDecorators(
-              "decorators" in param ? (param as any).decorators : undefined,
+              param.getChildren() ?? [],
               sourceFile
             ),
           });
@@ -297,10 +275,7 @@ function extractClassMetadata(
   const generics: string[] = node.typeParameters
     ? node.typeParameters.map((tp) => tp.name.text)
     : [];
-  const decorators = extractDecorators(
-    "decorators" in node ? (node as any).decorators : undefined,
-    sourceFile
-  );
+  const decorators = extractDecorators(node.getChildren() ?? [], sourceFile);
   return {
     fqName,
     kind: OpCode.REF_CLASS,
@@ -315,17 +290,13 @@ function extractFunctionMetadata(
 ): RTTIMetadata {
   const fqName = fqNameFromNode(node, sourceFile);
   // Parameters
-  const params: {
-    name: string;
-    type: PrimitiveType;
-    decorators: { name: string; args: string[] }[];
-  }[] = [];
+  const params: RTTIParameter[] = [];
   node.parameters.forEach((param) => {
     const name = param.name.getText(sourceFile);
-    let pType = PrimitiveType.Unknown;
+    let pType = Primitive.Unknown;
     if (param.type) {
       const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-      pType = getPrimitiveType(typeObj);
+      pType = getPrimitive(typeObj);
     }
     const paramDecorators = extractDecorators(
       "decorators" in param ? (param as any).decorators : undefined,
@@ -334,10 +305,10 @@ function extractFunctionMetadata(
     params.push({ name, type: pType, decorators: paramDecorators });
   });
   // Return type
-  let returnType = PrimitiveType.Unknown;
+  let returnType = Primitive.Unknown;
   if (node.type) {
     const typeObj = typeChecker.getTypeFromTypeNode(node.type);
-    returnType = getPrimitiveType(typeObj);
+    returnType = getPrimitive(typeObj);
   }
   // Generics
   const generics: string[] = node.typeParameters
@@ -356,21 +327,26 @@ function extractFunctionMetadata(
 }
 
 function extractDecorators(
-  decorators: ts.NodeArray<ts.Decorator> | undefined,
+  nodes: readonly ts.Node[] | undefined,
   sourceFile: ts.SourceFile
 ): { name: string; args: string[] }[] {
-  if (!decorators) return [];
-  return decorators.map((deco) => {
-    let name = "",
-      args: string[] = [];
-    if (ts.isCallExpression(deco.expression)) {
-      name = deco.expression.expression.getText(sourceFile);
-      args = deco.expression.arguments.map((arg) => arg.getText(sourceFile));
-    } else {
-      name = deco.expression.getText(sourceFile);
+  if (!nodes || nodes.length === 0) return [];
+  const decos: RTTIDecorator[] = [];
+  nodes.forEach((node) => {
+    if (ts.isDecorator(node)) {
+      let name = "",
+        args: string[] = [];
+      const expression = node.expression;
+      if (ts.isCallExpression(expression)) {
+        name = expression.expression.getText(sourceFile);
+        args = expression.arguments.map((arg) => arg.getText(sourceFile));
+      } else {
+        name = node.expression.getText(sourceFile);
+      }
+      decos.push({ name, args });
     }
-    return { name, args };
   });
+  return decos;
 }
 
 async function main(): Promise<void> {
@@ -435,18 +411,7 @@ async function main(): Promise<void> {
         }
 
         // Extract properties and methods
-        const props: {
-          name: string;
-          kind: "property" | "method";
-          type: PrimitiveType;
-          flags: number;
-          decorators: { name: string; args: string[] }[];
-          parameters?: {
-            name: string;
-            type: PrimitiveType;
-            decorators: { name: string; args: string[] }[];
-          }[];
-        }[] = [];
+        const props: RTTIPropInfo[] = [];
         for (const member of node.members) {
           // Properties: PropertySignature
           if (
@@ -464,7 +429,7 @@ async function main(): Promise<void> {
             props.push({
               name,
               kind: "property",
-              type: getPrimitiveType(typeObj),
+              type: getPrimitive(typeObj),
               flags,
               decorators: extractDecorators(
                 (member as any).decorators,
@@ -481,10 +446,10 @@ async function main(): Promise<void> {
             const name = member.name.text;
             const parameters = member.parameters.map((param) => {
               const pname = param.name.getText(sourceFile);
-              let pType = PrimitiveType.Unknown;
+              let pType = Primitive.Unknown;
               if (param.type) {
                 const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-                pType = getPrimitiveType(typeObj);
+                pType = getPrimitive(typeObj);
               }
               return {
                 name: pname,
@@ -498,7 +463,7 @@ async function main(): Promise<void> {
             props.push({
               name,
               kind: "method",
-              type: PrimitiveType.Unknown, // you may enhance to use method return type if desired
+              type: Primitive.Unknown, // you may enhance to use method return type if desired
               flags: 0,
               decorators: extractDecorators(
                 (member as any).decorators,

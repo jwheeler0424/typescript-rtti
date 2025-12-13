@@ -3,10 +3,14 @@ import {
   fnv1aHash,
   IndexEntry,
   OpCode,
-  PrimitiveType,
   StringTable,
 } from "./protocol";
-import { type RTTIMetadata } from "./types";
+import {
+  RTTIConditionalMetadata,
+  RTTIMappedMetadata,
+  RTTIUnionMetadata,
+  type RTTIMetadata,
+} from "./types";
 
 function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
   const total = arrays.reduce((sum, a) => sum + a.length, 0);
@@ -43,32 +47,6 @@ export class RTTISerializer {
   }
 
   serializeMetadata(meta: RTTIMetadata): Uint8Array {
-    switch (meta.kind) {
-      case OpCode.REF_CLASS:
-      case OpCode.REF_OBJECT: {
-        // IntelliSense: meta.data is class/object shape!
-        meta.data.props; // ✅
-        meta.data.generics; // ✅
-        break;
-      }
-      case OpCode.REF_FUNCTION: {
-        meta.data.params; // ✅
-        meta.data.generics; // ✅
-        break;
-      }
-      case OpCode.REF_MAPPED: {
-        meta.data.keyName; // ✅
-        meta.data.keyConstraint; // ✅
-        meta.data.valueType; // ✅
-        break;
-      }
-      case OpCode.REF_CONDITIONAL: {
-        meta.data.checkType; // ✅
-        meta.data.extendsType; // ✅
-        break;
-      }
-      // ...etc
-    }
     const chunks: Uint8Array[] = [];
     chunks.push(new Uint8Array([meta.kind]));
 
@@ -231,7 +209,8 @@ export class RTTISerializer {
       meta.kind === OpCode.REF_UNION ||
       meta.kind === OpCode.REF_INTERSECTION
     ) {
-      const members: string[] = (meta.data as any).members ?? [];
+      const members: string[] =
+        (meta.data as RTTIUnionMetadata["data"]).members ?? [];
       chunks.push(encodeVarint(members.length));
       for (const m of members) {
         const idx = this.stringTable.add(m);
@@ -240,7 +219,7 @@ export class RTTISerializer {
     }
 
     if (meta.kind === OpCode.REF_MAPPED) {
-      const { keyName, valueType } = meta.data;
+      const { keyName, valueType } = meta.data as RTTIMappedMetadata["data"];
       const keyIdx = this.stringTable.add(keyName);
       const valIdx = this.stringTable.add(valueType);
       chunks.push(encodeVarint(keyIdx));
@@ -248,7 +227,8 @@ export class RTTISerializer {
     }
 
     if (meta.kind === OpCode.REF_CONDITIONAL) {
-      const { checkType, extendsType, trueType, falseType } = meta.data;
+      const { checkType, extendsType, trueType, falseType } =
+        meta.data as RTTIConditionalMetadata["data"];
       chunks.push(encodeVarint(this.stringTable.add(checkType)));
       chunks.push(encodeVarint(this.stringTable.add(extendsType)));
       chunks.push(encodeVarint(this.stringTable.add(trueType)));
@@ -281,43 +261,4 @@ export class RTTISerializer {
 
     return { stringTableBuffer, indexBuffer, heapBuffer };
   }
-}
-
-// --- Example manual usage for dev/testing ---
-if (process.env["SERIALIZER_DEMO"]) {
-  const serializer = new RTTISerializer();
-  serializer.addType({
-    fqName: "User.id",
-    kind: OpCode.REF_PRIMITIVE,
-    data: PrimitiveType.Number,
-  });
-  serializer.addType({
-    fqName: "User",
-    kind: OpCode.REF_CLASS,
-    data: {
-      props: [
-        {
-          name: "id",
-          kind: "property",
-          type: PrimitiveType.Number,
-          flags: 0,
-          decorators: [],
-        },
-        {
-          name: "name",
-          kind: "property",
-          type: PrimitiveType.String,
-          flags: 0,
-          decorators: [],
-        },
-      ],
-      generics: [],
-      decorators: [],
-      bases: [],
-    },
-  });
-  const sections = serializer.buildBinarySections();
-  console.log("Demo string table bytes:", sections.stringTableBuffer.length);
-  console.log("Demo index bytes:", sections.indexBuffer.length);
-  console.log("Demo heap bytes:", sections.heapBuffer.length);
 }

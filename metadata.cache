@@ -2,10 +2,10 @@
   "version": 1,
   "files": {
     "src/Box.ts": {
-      "mtimeMs": 1765232403303.1616,
+      "mtimeMs": 1765645285289.8406,
       "typeHashes": {
-        "Box": "ff886952299108a6dba26e07d28f91dffb1d979c",
-        "wrap": "21cd12e118c9fbba79bc46b63b5c625abdd4ca6b"
+        "Box": "3e6c2efc8c75033f4c37678abe946ef28b753a59",
+        "wrap": "572617819ed4208c74e9752c62e4d2b4e74c9f16"
       },
       "types": [
         {
@@ -16,14 +16,14 @@
               {
                 "name": "value",
                 "kind": "property",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": []
               },
               {
                 "name": "meta",
                 "kind": "property",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": []
               }
@@ -43,24 +43,23 @@
             "params": [
               {
                 "name": "val",
-                "type": 9,
+                "type": 2,
                 "decorators": []
               }
             ],
-            "returnType": 9,
+            "returnType": 2,
             "generics": [
               "T"
-            ],
-            "decorators": []
+            ]
           }
         }
       ]
     },
     "src/Demo.ts": {
-      "mtimeMs": 1765497894672.9507,
+      "mtimeMs": 1765645285290.937,
       "typeHashes": {
-        "dec": "441910d0a9c6c087967d75be3baeaae05d31726f",
-        "Demo": "4e441e56301b46c380eae227b4ae4e26f40c1d36"
+        "dec": "9bb932f58c9c66f8bb07f19fd9b2aacd861ebc15",
+        "Demo": "c8cb99a8243f67ea83eadc908449daf7aae9da6e"
       },
       "types": [
         {
@@ -70,13 +69,12 @@
             "params": [
               {
                 "name": "args",
-                "type": 9,
+                "type": 2,
                 "decorators": []
               }
             ],
-            "returnType": 9,
-            "generics": [],
-            "decorators": []
+            "returnType": 2,
+            "generics": []
           }
         },
         {
@@ -87,18 +85,18 @@
               {
                 "name": "foo",
                 "kind": "method",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": [],
                 "parameters": [
                   {
                     "name": "x",
-                    "type": 2,
+                    "type": 4,
                     "decorators": []
                   },
                   {
                     "name": "y",
-                    "type": 1,
+                    "type": 8,
                     "decorators": []
                   }
                 ]
@@ -106,14 +104,14 @@
               {
                 "name": "bar",
                 "kind": "property",
-                "type": 1,
+                "type": 8,
                 "flags": 20,
                 "decorators": []
               },
               {
                 "name": "baz",
                 "kind": "property",
-                "type": 3,
+                "type": 16,
                 "flags": 11,
                 "decorators": []
               }
@@ -126,10 +124,10 @@
       ]
     },
     "src/Overloads.ts": {
-      "mtimeMs": 1765498551867.0105,
+      "mtimeMs": 1765645285292.1443,
       "typeHashes": {
-        "wrap": "4e608dbe03be49cc51cab79588dcb31e813a9d5a",
-        "DemoOverload": "f15df3b559f7e9c2a513841b2bdc4c0ffd73408e"
+        "wrap": "fa105a55bdbe9fa18feb58a8f47f55dba45c4fcc",
+        "DemoOverload": "7f500f40b8bbcd552df5fa103c8d66ec3e140d30"
       },
       "types": [
         {
@@ -139,29 +137,12 @@
             "params": [
               {
                 "name": "a",
-                "type": 2,
+                "type": 4,
                 "decorators": []
               }
             ],
-            "returnType": 1,
-            "generics": [],
-            "decorators": []
-          }
-        },
-        {
-          "fqName": "wrap",
-          "kind": 5,
-          "data": {
-            "params": [
-              {
-                "name": "a",
-                "type": 1,
-                "decorators": []
-              }
-            ],
-            "returnType": 2,
-            "generics": [],
-            "decorators": []
+            "returnType": 8,
+            "generics": []
           }
         },
         {
@@ -175,9 +156,23 @@
                 "decorators": []
               }
             ],
-            "returnType": 8,
-            "generics": [],
-            "decorators": []
+            "returnType": 4,
+            "generics": []
+          }
+        },
+        {
+          "fqName": "wrap",
+          "kind": 5,
+          "data": {
+            "params": [
+              {
+                "name": "a",
+                "type": 1,
+                "decorators": []
+              }
+            ],
+            "returnType": 1,
+            "generics": []
           }
         },
         {
@@ -188,13 +183,13 @@
               {
                 "name": "foo",
                 "kind": "method",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": [],
                 "parameters": [
                   {
                     "name": "a",
-                    "type": 2,
+                    "type": 4,
                     "decorators": []
                   }
                 ]
@@ -202,21 +197,7 @@
               {
                 "name": "foo",
                 "kind": "method",
-                "type": 9,
-                "flags": 0,
-                "decorators": [],
-                "parameters": [
-                  {
-                    "name": "a",
-                    "type": 1,
-                    "decorators": []
-                  }
-                ]
-              },
-              {
-                "name": "foo",
-                "kind": "method",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": [],
                 "parameters": [
@@ -226,131 +207,16 @@
                     "decorators": []
                   }
                 ]
-              }
-            ],
-            "generics": [],
-            "decorators": [],
-            "bases": []
-          }
-        }
-      ]
-    },
-    "src/TestModel.ts": {
-      "mtimeMs": 1765496985795.0242,
-      "typeHashes": {
-        "Person": "812b80f6b836397f64428912cae3dfb506cbccbb",
-        "greet": "923ebf4f2626ba8c064930d32d1c09632a540872",
-        "dec": "441910d0a9c6c087967d75be3baeaae05d31726f",
-        "Demo": "459b26ada0fde16d9ebda8cd09da4047ea560360"
-      },
-      "types": [
-        {
-          "fqName": "Person",
-          "kind": 4,
-          "data": {
-            "props": [
-              {
-                "name": "name",
-                "kind": "property",
-                "type": 2,
-                "flags": 0,
-                "decorators": []
               },
               {
-                "name": "isActive",
-                "kind": "property",
-                "type": 3,
-                "flags": 0,
-                "decorators": []
-              },
-              {
-                "name": "constructor",
-                "kind": "constructor",
-                "type": 9,
-                "flags": 0,
-                "decorators": [],
-                "parameters": [
-                  {
-                    "name": "id",
-                    "type": 1,
-                    "decorators": []
-                  },
-                  {
-                    "name": "name",
-                    "type": 2,
-                    "decorators": []
-                  },
-                  {
-                    "name": "isActive",
-                    "type": 3,
-                    "decorators": []
-                  }
-                ]
-              },
-              {
-                "name": "id",
-                "kind": "property",
-                "type": 1,
-                "flags": 8,
-                "decorators": []
-              }
-            ],
-            "generics": [],
-            "decorators": [],
-            "bases": []
-          }
-        },
-        {
-          "fqName": "greet",
-          "kind": 5,
-          "data": {
-            "params": [
-              {
-                "name": "name",
-                "type": 2,
-                "decorators": []
-              }
-            ],
-            "returnType": 2,
-            "generics": [],
-            "decorators": []
-          }
-        },
-        {
-          "fqName": "dec",
-          "kind": 5,
-          "data": {
-            "params": [
-              {
-                "name": "args",
-                "type": 9,
-                "decorators": []
-              }
-            ],
-            "returnType": 9,
-            "generics": [],
-            "decorators": []
-          }
-        },
-        {
-          "fqName": "Demo",
-          "kind": 4,
-          "data": {
-            "props": [
-              {
-                "name": "methodA",
+                "name": "foo",
                 "kind": "method",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": [],
                 "parameters": [
                   {
-                    "name": "x",
-                    "type": 2,
-                    "decorators": []
-                  },
-                  {
-                    "name": "y",
+                    "name": "a",
                     "type": 1,
                     "decorators": []
                   }
@@ -365,7 +231,7 @@
       ]
     },
     "src/TestTypes.ts": {
-      "mtimeMs": 1765317747657.178,
+      "mtimeMs": 1765645285292.6946,
       "typeHashes": {
         "Keys": "45f42560c8b20a47e4a03f32b17744ecdb146cea",
         "Mapped": "8c0a61f44832304841b5e6c093d4b85f91ce3e6d",
@@ -415,13 +281,13 @@
       ]
     },
     "src/User.ts": {
-      "mtimeMs": 1765497753886.184,
+      "mtimeMs": 1765660255825.4495,
       "typeHashes": {
-        "entity": "bd32b7e351b4400515de90dd6e196491386c11f4",
-        "field": "86f90e0f5a97b62c46e954a1ecaac9ebe74c8c21",
-        "log": "2419380a56670fc4816cae9d698646e2b9cb068e",
-        "inject": "a778fe13cd86907086b2ef455eaf2be6b03bdcc1",
-        "User": "92700a05d37001cc3284d1cae32c58ece3d2d147"
+        "entity": "c17d771076209dab6c0a56fd2a93d16860f24008",
+        "field": "0e276602273c81bfea09fbf6f4e36eca8788d120",
+        "log": "346947bef66f8e0934029d22f71e3ce663d489a7",
+        "inject": "46d1090e53662a74365708e1676fc1e0e12fd7c9",
+        "User": "1796da3767c7b06e6575384866dd6e8efd70fc71"
       },
       "types": [
         {
@@ -431,15 +297,14 @@
             "params": [
               {
                 "name": "target",
-                "type": 9,
+                "type": 2,
                 "decorators": []
               }
             ],
-            "returnType": 9,
+            "returnType": 2,
             "generics": [
               "T"
-            ],
-            "decorators": []
+            ]
           }
         },
         {
@@ -449,13 +314,12 @@
             "params": [
               {
                 "name": "meta",
-                "type": 8,
+                "type": 1,
                 "decorators": []
               }
             ],
-            "returnType": 9,
-            "generics": [],
-            "decorators": []
+            "returnType": 2,
+            "generics": []
           }
         },
         {
@@ -465,13 +329,12 @@
             "params": [
               {
                 "name": "args",
-                "type": 9,
+                "type": 2,
                 "decorators": []
               }
             ],
-            "returnType": 9,
-            "generics": [],
-            "decorators": []
+            "returnType": 2,
+            "generics": []
           }
         },
         {
@@ -481,13 +344,12 @@
             "params": [
               {
                 "name": "key",
-                "type": 2,
+                "type": 4,
                 "decorators": []
               }
             ],
-            "returnType": 9,
-            "generics": [],
-            "decorators": []
+            "returnType": 2,
+            "generics": []
           }
         },
         {
@@ -498,44 +360,44 @@
               {
                 "name": "id",
                 "kind": "property",
-                "type": 2,
+                "type": 4,
                 "flags": 0,
                 "decorators": []
               },
               {
                 "name": "name",
                 "kind": "property",
-                "type": 2,
+                "type": 4,
                 "flags": 0,
                 "decorators": []
               },
               {
                 "name": "email",
                 "kind": "property",
-                "type": 2,
+                "type": 4,
                 "flags": 4,
                 "decorators": []
               },
               {
                 "name": "constructor",
                 "kind": "constructor",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": [],
                 "parameters": [
                   {
                     "name": "id",
-                    "type": 2,
+                    "type": 4,
                     "decorators": []
                   },
                   {
                     "name": "name",
-                    "type": 2,
+                    "type": 4,
                     "decorators": []
                   },
                   {
                     "name": "email",
-                    "type": 2,
+                    "type": 4,
                     "decorators": []
                   }
                 ]
@@ -543,13 +405,13 @@
               {
                 "name": "save",
                 "kind": "method",
-                "type": 9,
+                "type": 2,
                 "flags": 0,
                 "decorators": [],
                 "parameters": [
                   {
                     "name": "id",
-                    "type": 2,
+                    "type": 4,
                     "decorators": []
                   }
                 ]
@@ -563,12 +425,12 @@
       ]
     },
     "src/index.ts": {
-      "mtimeMs": 1765228398762.5923,
+      "mtimeMs": 1765645285294.8518,
       "typeHashes": {},
       "types": []
     },
     "src/lib/index.ts": {
-      "mtimeMs": 1764970438358.8137,
+      "mtimeMs": 1765645285296.455,
       "typeHashes": {},
       "types": []
     }
@@ -576,7 +438,7 @@
   "types": {
     "Box": {
       "fqName": "Box",
-      "hash": "ff886952299108a6dba26e07d28f91dffb1d979c",
+      "hash": "3e6c2efc8c75033f4c37678abe946ef28b753a59",
       "meta": {
         "fqName": "Box",
         "kind": 4,
@@ -585,14 +447,14 @@
             {
               "name": "value",
               "kind": "property",
-              "type": 9,
+              "type": 2,
               "flags": 0,
               "decorators": []
             },
             {
               "name": "meta",
               "kind": "property",
-              "type": 9,
+              "type": 2,
               "flags": 0,
               "decorators": []
             }
@@ -608,7 +470,7 @@
     },
     "wrap": {
       "fqName": "wrap",
-      "hash": "4e608dbe03be49cc51cab79588dcb31e813a9d5a",
+      "hash": "fa105a55bdbe9fa18feb58a8f47f55dba45c4fcc",
       "meta": {
         "fqName": "wrap",
         "kind": 5,
@@ -616,19 +478,18 @@
           "params": [
             {
               "name": "a",
-              "type": 8,
+              "type": 1,
               "decorators": []
             }
           ],
-          "returnType": 8,
-          "generics": [],
-          "decorators": []
+          "returnType": 1,
+          "generics": []
         }
       }
     },
     "dec": {
       "fqName": "dec",
-      "hash": "441910d0a9c6c087967d75be3baeaae05d31726f",
+      "hash": "9bb932f58c9c66f8bb07f19fd9b2aacd861ebc15",
       "meta": {
         "fqName": "dec",
         "kind": 5,
@@ -636,42 +497,55 @@
           "params": [
             {
               "name": "args",
-              "type": 9,
+              "type": 2,
               "decorators": []
             }
           ],
-          "returnType": 9,
-          "generics": [],
-          "decorators": []
+          "returnType": 2,
+          "generics": []
         }
       }
     },
     "Demo": {
       "fqName": "Demo",
-      "hash": "459b26ada0fde16d9ebda8cd09da4047ea560360",
+      "hash": "c8cb99a8243f67ea83eadc908449daf7aae9da6e",
       "meta": {
         "fqName": "Demo",
         "kind": 4,
         "data": {
           "props": [
             {
-              "name": "methodA",
+              "name": "foo",
               "kind": "method",
-              "type": 9,
+              "type": 2,
               "flags": 0,
               "decorators": [],
               "parameters": [
                 {
                   "name": "x",
-                  "type": 2,
+                  "type": 4,
                   "decorators": []
                 },
                 {
                   "name": "y",
-                  "type": 1,
+                  "type": 8,
                   "decorators": []
                 }
               ]
+            },
+            {
+              "name": "bar",
+              "kind": "property",
+              "type": 8,
+              "flags": 20,
+              "decorators": []
+            },
+            {
+              "name": "baz",
+              "kind": "property",
+              "type": 16,
+              "flags": 11,
+              "decorators": []
             }
           ],
           "generics": [],
@@ -682,7 +556,7 @@
     },
     "DemoOverload": {
       "fqName": "DemoOverload",
-      "hash": "f15df3b559f7e9c2a513841b2bdc4c0ffd73408e",
+      "hash": "7f500f40b8bbcd552df5fa103c8d66ec3e140d30",
       "meta": {
         "fqName": "DemoOverload",
         "kind": 4,
@@ -691,13 +565,13 @@
             {
               "name": "foo",
               "kind": "method",
-              "type": 9,
+              "type": 2,
               "flags": 0,
               "decorators": [],
               "parameters": [
                 {
                   "name": "a",
-                  "type": 2,
+                  "type": 4,
                   "decorators": []
                 }
               ]
@@ -705,21 +579,7 @@
             {
               "name": "foo",
               "kind": "method",
-              "type": 9,
-              "flags": 0,
-              "decorators": [],
-              "parameters": [
-                {
-                  "name": "a",
-                  "type": 1,
-                  "decorators": []
-                }
-              ]
-            },
-            {
-              "name": "foo",
-              "kind": "method",
-              "type": 9,
+              "type": 2,
               "flags": 0,
               "decorators": [],
               "parameters": [
@@ -729,91 +589,25 @@
                   "decorators": []
                 }
               ]
-            }
-          ],
-          "generics": [],
-          "decorators": [],
-          "bases": []
-        }
-      }
-    },
-    "Person": {
-      "fqName": "Person",
-      "hash": "812b80f6b836397f64428912cae3dfb506cbccbb",
-      "meta": {
-        "fqName": "Person",
-        "kind": 4,
-        "data": {
-          "props": [
+            },
             {
-              "name": "name",
-              "kind": "property",
+              "name": "foo",
+              "kind": "method",
               "type": 2,
-              "flags": 0,
-              "decorators": []
-            },
-            {
-              "name": "isActive",
-              "kind": "property",
-              "type": 3,
-              "flags": 0,
-              "decorators": []
-            },
-            {
-              "name": "constructor",
-              "kind": "constructor",
-              "type": 9,
               "flags": 0,
               "decorators": [],
               "parameters": [
                 {
-                  "name": "id",
+                  "name": "a",
                   "type": 1,
-                  "decorators": []
-                },
-                {
-                  "name": "name",
-                  "type": 2,
-                  "decorators": []
-                },
-                {
-                  "name": "isActive",
-                  "type": 3,
                   "decorators": []
                 }
               ]
-            },
-            {
-              "name": "id",
-              "kind": "property",
-              "type": 1,
-              "flags": 8,
-              "decorators": []
             }
           ],
           "generics": [],
           "decorators": [],
           "bases": []
-        }
-      }
-    },
-    "greet": {
-      "fqName": "greet",
-      "hash": "923ebf4f2626ba8c064930d32d1c09632a540872",
-      "meta": {
-        "fqName": "greet",
-        "kind": 5,
-        "data": {
-          "params": [
-            {
-              "name": "name",
-              "type": 2,
-              "decorators": []
-            }
-          ],
-          "returnType": 2,
-          "generics": [],
-          "decorators": []
         }
       }
     },
@@ -874,7 +668,7 @@
     },
     "entity": {
       "fqName": "entity",
-      "hash": "bd32b7e351b4400515de90dd6e196491386c11f4",
+      "hash": "c17d771076209dab6c0a56fd2a93d16860f24008",
       "meta": {
         "fqName": "entity",
         "kind": 5,
@@ -882,21 +676,20 @@
           "params": [
             {
               "name": "target",
-              "type": 9,
+              "type": 2,
               "decorators": []
             }
           ],
-          "returnType": 9,
+          "returnType": 2,
           "generics": [
             "T"
-          ],
-          "decorators": []
+          ]
         }
       }
     },
     "field": {
       "fqName": "field",
-      "hash": "86f90e0f5a97b62c46e954a1ecaac9ebe74c8c21",
+      "hash": "0e276602273c81bfea09fbf6f4e36eca8788d120",
       "meta": {
         "fqName": "field",
         "kind": 5,
@@ -904,19 +697,18 @@
           "params": [
             {
               "name": "meta",
-              "type": 8,
+              "type": 1,
               "decorators": []
             }
           ],
-          "returnType": 9,
-          "generics": [],
-          "decorators": []
+          "returnType": 2,
+          "generics": []
         }
       }
     },
     "log": {
       "fqName": "log",
-      "hash": "2419380a56670fc4816cae9d698646e2b9cb068e",
+      "hash": "346947bef66f8e0934029d22f71e3ce663d489a7",
       "meta": {
         "fqName": "log",
         "kind": 5,
@@ -924,19 +716,18 @@
           "params": [
             {
               "name": "args",
-              "type": 9,
+              "type": 2,
               "decorators": []
             }
           ],
-          "returnType": 9,
-          "generics": [],
-          "decorators": []
+          "returnType": 2,
+          "generics": []
         }
       }
     },
     "inject": {
       "fqName": "inject",
-      "hash": "a778fe13cd86907086b2ef455eaf2be6b03bdcc1",
+      "hash": "46d1090e53662a74365708e1676fc1e0e12fd7c9",
       "meta": {
         "fqName": "inject",
         "kind": 5,
@@ -944,19 +735,18 @@
           "params": [
             {
               "name": "key",
-              "type": 2,
+              "type": 4,
               "decorators": []
             }
           ],
-          "returnType": 9,
-          "generics": [],
-          "decorators": []
+          "returnType": 2,
+          "generics": []
         }
       }
     },
     "User": {
       "fqName": "User",
-      "hash": "92700a05d37001cc3284d1cae32c58ece3d2d147",
+      "hash": "1796da3767c7b06e6575384866dd6e8efd70fc71",
       "meta": {
         "fqName": "User",
         "kind": 4,
@@ -965,44 +755,44 @@
             {
               "name": "id",
               "kind": "property",
-              "type": 2,
+              "type": 4,
               "flags": 0,
               "decorators": []
             },
             {
               "name": "name",
               "kind": "property",
-              "type": 2,
+              "type": 4,
               "flags": 0,
               "decorators": []
             },
             {
               "name": "email",
               "kind": "property",
-              "type": 2,
+              "type": 4,
               "flags": 4,
               "decorators": []
             },
             {
               "name": "constructor",
               "kind": "constructor",
-              "type": 9,
+              "type": 2,
               "flags": 0,
               "decorators": [],
               "parameters": [
                 {
                   "name": "id",
-                  "type": 2,
+                  "type": 4,
                   "decorators": []
                 },
                 {
                   "name": "name",
-                  "type": 2,
+                  "type": 4,
                   "decorators": []
                 },
                 {
                   "name": "email",
-                  "type": 2,
+                  "type": 4,
                   "decorators": []
                 }
               ]
@@ -1010,13 +800,13 @@
             {
               "name": "save",
               "kind": "method",
-              "type": 9,
+              "type": 2,
               "flags": 0,
               "decorators": [],
               "parameters": [
                 {
                   "name": "id",
-                  "type": 2,
+                  "type": 4,
                   "decorators": []
                 }
               ]

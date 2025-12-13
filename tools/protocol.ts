@@ -1,35 +1,37 @@
+import { OpCodes, PrimitiveType, PrimitiveTypes } from "./types";
+
 export const META_MAGIC = 0x4d455441; // "META"
 export const PROTOCOL_VERSION = 1;
 export const FEATURE_BITMAP = 0x0001;
 export const HEADER_SIZE = 32;
 export const INDEX_ENTRY_SIZE = 24;
 
-export enum OpCode {
-  REF_PRIMITIVE = 1,
-  REF_ARRAY = 2,
-  REF_OBJECT = 3,
-  REF_CLASS = 4,
-  REF_FUNCTION = 5,
-  REF_GENERIC = 6,
-  REF_UNION = 7,
-  REF_INTERSECTION = 8,
-  REF_ENUM = 9,
-  REF_LITERAL = 10,
-  REF_MAPPED = 11,
-  REF_CONDITIONAL = 12,
-}
+export const OpCode: Record<keyof typeof OpCodes, number> = {
+  REF_PRIMITIVE: OpCodes.REF_PRIMITIVE,
+  REF_ARRAY: OpCodes.REF_ARRAY,
+  REF_OBJECT: OpCodes.REF_OBJECT,
+  REF_CLASS: OpCodes.REF_CLASS,
+  REF_FUNCTION: OpCodes.REF_FUNCTION,
+  REF_GENERIC: OpCodes.REF_GENERIC,
+  REF_UNION: OpCodes.REF_UNION,
+  REF_INTERSECTION: OpCodes.REF_INTERSECTION,
+  REF_ENUM: OpCodes.REF_ENUM,
+  REF_LITERAL: OpCodes.REF_LITERAL,
+  REF_MAPPED: OpCodes.REF_MAPPED,
+  REF_CONDITIONAL: OpCodes.REF_CONDITIONAL,
+} as const;
 
-export enum PrimitiveType {
-  Number = 1,
-  String = 2,
-  Boolean = 3,
-  Null = 4,
-  Undefined = 5,
-  Symbol = 6,
-  BigInt = 7,
-  Any = 8,
-  Unknown = 9,
-}
+export const Primitive: Record<keyof typeof PrimitiveTypes, PrimitiveType> = {
+  Number: PrimitiveTypes.Number as PrimitiveType,
+  String: PrimitiveTypes.String as PrimitiveType,
+  Boolean: PrimitiveTypes.Boolean as PrimitiveType,
+  Null: PrimitiveTypes.Null as PrimitiveType,
+  Undefined: PrimitiveTypes.Undefined as PrimitiveType,
+  ESSymbol: PrimitiveTypes.ESSymbol as PrimitiveType,
+  BigInt: PrimitiveTypes.BigInt as PrimitiveType,
+  Any: PrimitiveTypes.Any as PrimitiveType,
+  Unknown: PrimitiveTypes.Unknown as PrimitiveType,
+} as const;
 
 export interface ProtocolHeader {
   magic: number;

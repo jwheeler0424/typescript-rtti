@@ -1,6 +1,7 @@
 import { decodeRTTIEntry } from "./decoder";
-import { decodeVarint, OpCode, PrimitiveType } from "./protocol";
+import { decodeVarint } from "./protocol";
 import { MetadataStore } from "./reader";
+import { OpCodes, PrimitiveType, PrimitiveTypes, RTTIProperty } from "./types";
 
 export class Introspector {
   private store: MetadataStore;
@@ -13,16 +14,14 @@ export class Introspector {
     return this.store.listTypes();
   }
 
-  getTypeProperties(
-    typeName: string
-  ): { name: string; type: number }[] | undefined {
+  getTypeProperties(typeName: string): RTTIProperty[] | undefined {
     const entry = this.store.getEntryByName(typeName);
     if (!entry) return undefined;
     const buf = this.store.getMetadataBuffer(entry);
 
     let offset = 0;
     const opCode = buf[offset++];
-    if (opCode !== OpCode.REF_CLASS) return undefined;
+    if (opCode !== OpCodes.REF_CLASS) return undefined;
 
     // fqName varint
     const fqDecode = decodeVarint(buf, offset);
@@ -33,14 +32,14 @@ export class Introspector {
     const propCount = propDecode.value;
     offset = propDecode.next;
 
-    let props: { name: string; type: number }[] = [];
+    let props: RTTIProperty[] = [];
     for (let i = 0; i < propCount; i++) {
       const nameIdxDecode = decodeVarint(buf, offset);
       const nameIdx = nameIdxDecode.value;
       offset = nameIdxDecode.next;
 
       const typeDecode = decodeVarint(buf, offset);
-      const typeCode = typeDecode.value;
+      const typeCode: PrimitiveType = typeDecode.value as PrimitiveType;
       offset = typeDecode.next;
 
       const flagsDecode = decodeVarint(buf, offset);
@@ -92,15 +91,13 @@ export class Introspector {
     return props;
   }
 
-  getFunctionParams(
-    funcName: string
-  ): { name: string; type: number }[] | undefined {
+  getFunctionParams(funcName: string): RTTIProperty[] | undefined {
     const entry = this.store.getEntryByName(funcName);
     if (!entry) return undefined;
     const buf = this.store.getMetadataBuffer(entry);
     let offset = 0;
     const opCode = buf[offset++];
-    if (opCode !== OpCode.REF_FUNCTION) return undefined;
+    if (opCode !== OpCodes.REF_FUNCTION) return undefined;
 
     const fqDecode = decodeVarint(buf, offset);
     offset = fqDecode.next;
@@ -109,14 +106,14 @@ export class Introspector {
     const paramCount = paramCountDecode.value;
     offset = paramCountDecode.next;
 
-    let params: { name: string; type: number }[] = [];
+    let params: RTTIProperty[] = [];
     for (let i = 0; i < paramCount; i++) {
       const nameIdxDecode = decodeVarint(buf, offset);
       const nameIdx = nameIdxDecode.value;
       offset = nameIdxDecode.next;
 
       const typeDecode = decodeVarint(buf, offset);
-      const typeCode = typeDecode.value;
+      const typeCode = typeDecode.value as PrimitiveType;
       offset = typeDecode.next;
 
       // Skip decorators for this basic method
@@ -139,11 +136,11 @@ export class Introspector {
     return params;
   }
 
-  getTypeOpCode(typeName: string): OpCode | undefined {
+  getTypeOpCode(typeName: string): OpCodes | undefined {
     const entry = this.store.getEntryByName(typeName);
     if (!entry) return undefined;
     const buf = this.store.getMetadataBuffer(entry);
-    return buf[0] as OpCode;
+    return buf[0] as OpCodes;
   }
 
   getRawMetadata(typeName: string): Uint8Array | undefined {
@@ -161,7 +158,7 @@ export class Introspector {
 
     let offset = 0;
     const opCode = buf[offset++];
-    if (opCode !== OpCode.REF_ENUM) return undefined;
+    if (opCode !== OpCodes.REF_ENUM) return undefined;
 
     const fqNameDecode = decodeVarint(buf, offset);
     offset = fqNameDecode.next;
@@ -215,7 +212,7 @@ export class Introspector {
     offset = fqNameDecode.next;
 
     // skip props or params
-    if (opCode === OpCode.REF_CLASS) {
+    if (opCode === OpCodes.REF_CLASS) {
       const propDecode = decodeVarint(buf, offset);
       const propCount = propDecode.value;
       offset = propDecode.next;
@@ -248,7 +245,7 @@ export class Introspector {
           }
         }
       }
-    } else if (opCode === OpCode.REF_FUNCTION) {
+    } else if (opCode === OpCodes.REF_FUNCTION) {
       const paramDecode = decodeVarint(buf, offset);
       const paramCount = paramDecode.value;
       offset = paramDecode.next;
@@ -289,7 +286,7 @@ export class Introspector {
     const buf = this.store.getMetadataBuffer(entry);
     let offset = 0;
     const opCode = buf[offset++];
-    if (opCode !== OpCode.REF_UNION) return undefined;
+    if (opCode !== OpCodes.REF_UNION) return undefined;
 
     const fqNameDecode = decodeVarint(buf, offset);
     offset = fqNameDecode.next;
@@ -312,7 +309,7 @@ export class Introspector {
     const buf = this.store.getMetadataBuffer(entry);
     let offset = 0;
     const opCode = buf[offset++];
-    if (opCode !== OpCode.REF_INTERSECTION) return undefined;
+    if (opCode !== OpCodes.REF_INTERSECTION) return undefined;
 
     const fqNameDecode = decodeVarint(buf, offset);
     offset = fqNameDecode.next;
@@ -338,7 +335,7 @@ export class Introspector {
 
     let offset = 0;
     const opCode = buf[offset++];
-    if (opCode !== OpCode.REF_CLASS) return undefined;
+    if (opCode !== OpCodes.REF_CLASS) return undefined;
 
     const fqDecode = decodeVarint(buf, offset);
     offset = fqDecode.next;
@@ -412,7 +409,7 @@ export class Introspector {
     offset = decodeVarint(buf, offset).next;
 
     // Skip to decorators block:
-    if (op === OpCode.REF_CLASS) {
+    if (op === OpCodes.REF_CLASS) {
       const propCt = decodeVarint(buf, offset).value;
       offset = decodeVarint(buf, offset).next;
       for (let i = 0; i < propCt; i++) {
@@ -445,7 +442,7 @@ export class Introspector {
           }
         }
       }
-    } else if (op === OpCode.REF_FUNCTION) {
+    } else if (op === OpCodes.REF_FUNCTION) {
       const paramCt = decodeVarint(buf, offset).value;
       offset = decodeVarint(buf, offset).next;
       for (let i = 0; i < paramCt; i++) {
@@ -505,7 +502,7 @@ export class Introspector {
 
     let offset = 0;
     const op = buf[offset++];
-    if (op !== OpCode.REF_FUNCTION) return undefined;
+    if (op !== OpCodes.REF_FUNCTION) return undefined;
 
     offset = decodeVarint(buf, offset).next;
 
@@ -559,7 +556,7 @@ export class Introspector {
     // fqName
     offset = decodeVarint(buf, offset).next;
 
-    if (opCode === OpCode.REF_CLASS) {
+    if (opCode === OpCodes.REF_CLASS) {
       // skip all type properties, as in getTypePropertiesWithFlags above
       const propDecode = decodeVarint(buf, offset);
       const propCt = propDecode.value;
@@ -662,27 +659,27 @@ async function demoIntrospection() {
   console.log("*** All RTTI Types/Functions:");
   introspect.listAllTypes().forEach((name) => {
     const op = introspect.getTypeOpCode(name);
-    console.log(`• ${name}: ${OpCode[op!] ?? op}`);
+    console.log(`• ${name}: ${OpCodes[op!] ?? op}`);
   });
 
   // Show properties for all classes
   introspect.listAllTypes().forEach((name) => {
-    if (introspect.getTypeOpCode(name) === OpCode.REF_CLASS) {
+    if (introspect.getTypeOpCode(name) === OpCodes.REF_CLASS) {
       const props = introspect.getTypeProperties(name)!;
       console.log(`Class ${name} props:`);
       props.forEach((p) =>
-        console.log(`  ${p.name} (${PrimitiveType[p.type] ?? p.type})`)
+        console.log(`  ${p.name} (${PrimitiveTypes[p.type] ?? p.type})`)
       );
     }
   });
 
   // Show params for all functions
   introspect.listAllTypes().forEach((name) => {
-    if (introspect.getTypeOpCode(name) === OpCode.REF_FUNCTION) {
+    if (introspect.getTypeOpCode(name) === OpCodes.REF_FUNCTION) {
       const params = introspect.getFunctionParams(name)!;
       console.log(`Function ${name} params:`);
       params.forEach((p) =>
-        console.log(`  ${p.name} (${PrimitiveType[p.type] ?? p.type})`)
+        console.log(`  ${p.name} (${PrimitiveTypes[p.type] ?? p.type})`)
       );
     }
   });

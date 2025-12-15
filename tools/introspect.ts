@@ -1,7 +1,22 @@
 import { decodeRTTIEntry } from "./decoder";
-import { decodeVarint } from "./protocol";
 import { MetadataStore } from "./reader";
-import { OpCodes, PrimitiveType, PrimitiveTypes, RTTIProperty } from "./types";
+import {
+  OpCodes,
+  type PrimitiveType,
+  type RTTIDecorator,
+  type RTTIEnumMetadata,
+  type RTTIGenericParam,
+  type RTTIMetadata,
+  type RTTIMethodOverload,
+  type RTTIParameter,
+  type RTTIPropInfo,
+  type RTTITypeRef,
+} from "./types";
+
+/**
+ * Full property/member info as given by RTTIPropInfo at runtime.
+ */
+export type IntrospectedProp = RTTIPropInfo;
 
 export class Introspector {
   private store: MetadataStore;
@@ -10,627 +25,650 @@ export class Introspector {
     this.store = store;
   }
 
+  /**
+   * List all fully-qualified type/function names in the registry.
+   */
   listAllTypes(): string[] {
     return this.store.listTypes();
   }
 
-  getTypeProperties(typeName: string): RTTIProperty[] | undefined {
+  /**
+   * Returns all properties/methods/accessors/etc. for a class/interface,
+   * as structured RTTIPropInfo[] (directly matching the TypeScript definition).
+   */
+  getTypeProperties(typeName: string): RTTIPropInfo[] | undefined {
     const entry = this.store.getEntryByName(typeName);
     if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-
-    let offset = 0;
-    const opCode = buf[offset++];
-    if (opCode !== OpCodes.REF_CLASS) return undefined;
-
-    // fqName varint
-    const fqDecode = decodeVarint(buf, offset);
-    offset = fqDecode.next;
-
-    // propCount varint
-    const propDecode = decodeVarint(buf, offset);
-    const propCount = propDecode.value;
-    offset = propDecode.next;
-
-    let props: RTTIProperty[] = [];
-    for (let i = 0; i < propCount; i++) {
-      const nameIdxDecode = decodeVarint(buf, offset);
-      const nameIdx = nameIdxDecode.value;
-      offset = nameIdxDecode.next;
-
-      const typeDecode = decodeVarint(buf, offset);
-      const typeCode: PrimitiveType = typeDecode.value as PrimitiveType;
-      offset = typeDecode.next;
-
-      const flagsDecode = decodeVarint(buf, offset);
-      offset = flagsDecode.next;
-
-      // Skip member decorators
-      const decoCountDecode = decodeVarint(buf, offset);
-      const decoCount = decoCountDecode.value;
-      offset = decoCountDecode.next;
-      for (let d = 0; d < decoCount; d++) {
-        const decoNameDecode = decodeVarint(buf, offset);
-        offset = decoNameDecode.next;
-        const argCountDecode = decodeVarint(buf, offset);
-        const argCount = argCountDecode.value;
-        offset = argCountDecode.next;
-        for (let a = 0; a < argCount; a++) {
-          const argIdxDecode = decodeVarint(buf, offset);
-          offset = argIdxDecode.next;
-        }
-      }
-      // Skip parameters
-      const paramCountDecode = decodeVarint(buf, offset);
-      const paramCount = paramCountDecode.value;
-      offset = paramCountDecode.next;
-      for (let p = 0; p < paramCount; p++) {
-        const paramNameDecode = decodeVarint(buf, offset);
-        offset = paramNameDecode.next;
-        const paramTypeDecode = decodeVarint(buf, offset);
-        offset = paramTypeDecode.next;
-        const paramDecoCountDecode = decodeVarint(buf, offset);
-        const paramDecoCount = paramDecoCountDecode.value;
-        offset = paramDecoCountDecode.next;
-        for (let pd = 0; pd < paramDecoCount; pd++) {
-          const paramDecoNameDecode = decodeVarint(buf, offset);
-          offset = paramDecoNameDecode.next;
-          const paramArgCountDecode = decodeVarint(buf, offset);
-          const paramArgCount = paramArgCountDecode.value;
-          offset = paramArgCountDecode.next;
-          for (let pa = 0; pa < paramArgCount; pa++) {
-            const paramArgIdxDecode = decodeVarint(buf, offset);
-            offset = paramArgIdxDecode.next;
-          }
-        }
-      }
-
-      const propName = this.store.getStrings()[nameIdx];
-      props.push({ name: propName, type: typeCode });
+    const decoded = this.getEntryDecoded(typeName);
+    if (
+      !decoded ||
+      !(
+        decoded.kind === OpCodes.REF_CLASS ||
+        decoded.kind === OpCodes.REF_OBJECT
+      ) ||
+      !decoded.props
+    ) {
+      return undefined;
     }
-    return props;
+    // Each is a RTTIPropInfo structure
+    return decoded.props;
   }
 
-  getFunctionParams(funcName: string): RTTIProperty[] | undefined {
-    const entry = this.store.getEntryByName(funcName);
+  /**
+   * Returns the full decoded RTTIMetadata. This is a strongly-typed discriminated union.
+   */
+  getEntryDecoded(typeName: string): any | undefined {
+    const entry = this.store.getEntryByName(typeName);
     if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-    let offset = 0;
-    const opCode = buf[offset++];
-    if (opCode !== OpCodes.REF_FUNCTION) return undefined;
-
-    const fqDecode = decodeVarint(buf, offset);
-    offset = fqDecode.next;
-
-    const paramCountDecode = decodeVarint(buf, offset);
-    const paramCount = paramCountDecode.value;
-    offset = paramCountDecode.next;
-
-    let params: RTTIProperty[] = [];
-    for (let i = 0; i < paramCount; i++) {
-      const nameIdxDecode = decodeVarint(buf, offset);
-      const nameIdx = nameIdxDecode.value;
-      offset = nameIdxDecode.next;
-
-      const typeDecode = decodeVarint(buf, offset);
-      const typeCode = typeDecode.value as PrimitiveType;
-      offset = typeDecode.next;
-
-      // Skip decorators for this basic method
-      const paramDeccoDecode = decodeVarint(buf, offset);
-      const decos = paramDeccoDecode.value;
-      offset = paramDeccoDecode.next;
-      for (let d = 0; d < decos; d++) {
-        const decoNameDecode = decodeVarint(buf, offset);
-        offset = decoNameDecode.next;
-        const argCountDecode = decodeVarint(buf, offset);
-        const argCount = argCountDecode.value;
-        offset = argCountDecode.next;
-        for (let a = 0; a < argCount; a++) {
-          const argIdxDecode = decodeVarint(buf, offset);
-          offset = argIdxDecode.next;
-        }
-      }
-      params.push({ name: this.store.getStrings()[nameIdx], type: typeCode });
-    }
-    return params;
+    const safeGetString = (idx: number) =>
+      this.store.getStrings()[idx] ?? "<unknown>";
+    return decodeRTTIEntry(this.store.getMetadataBuffer(entry), safeGetString);
   }
 
+  /**
+   * For functions and methods: get params, types, and all param decorators — as RTTIParameter[].
+   */
+  getFunctionParams(funcName: string): RTTIParameter[] | undefined {
+    const info = this.getEntryDecoded(funcName);
+    if (
+      info &&
+      info.kind === OpCodes.REF_FUNCTION &&
+      Array.isArray(info.params)
+    ) {
+      return info.params;
+    }
+    return undefined;
+  }
+
+  /**
+   * For functions with generics: returns param names and constraints, as RTTIGenericParam[].
+   */
+  getGenerics(typeName: string): RTTIGenericParam[] | undefined {
+    const info = this.getEntryDecoded(typeName);
+    if (!info || !Array.isArray(info.generics)) return undefined;
+    return info.generics;
+  }
+
+  /**
+   * For class types, returns base types (extends/implements), as string array.
+   */
+  getBaseTypes(typeName: string): string[] | undefined {
+    const info = this.getEntryDecoded(typeName);
+    if (!info || !Array.isArray(info.bases)) return undefined;
+    return info.bases;
+  }
+
+  /**
+   * Get the enum value/name pairs for an enum.
+   */
+  getEnumMembers(enumName: string): RTTIEnumMetadata[] | undefined {
+    const info = this.getEntryDecoded(enumName);
+    if (info && info.kind === OpCodes.REF_ENUM && Array.isArray(info.members)) {
+      return info.members;
+    }
+    return undefined;
+  }
+
+  /**
+   * Get the OpCode for a registered RTTI entry.
+   */
   getTypeOpCode(typeName: string): OpCodes | undefined {
     const entry = this.store.getEntryByName(typeName);
     if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-    return buf[0] as OpCodes;
+    return this.store.getMetadataBuffer(entry)[0] as OpCodes;
   }
 
+  /**
+   * Returns all type-level decorators (for classes, interfaces, or functions).
+   */
+  getDecorators(typeName: string): RTTIDecorator[] | undefined {
+    const info = this.getEntryDecoded(typeName);
+    if (!info || !Array.isArray(info.decorators)) return undefined;
+    return info.decorators;
+  }
+
+  /**
+   * Returns the raw, unprocessed buffer for any RTTI entry.
+   */
   getRawMetadata(typeName: string): Uint8Array | undefined {
     const entry = this.store.getEntryByName(typeName);
     if (!entry) return undefined;
     return this.store.getMetadataBuffer(entry);
   }
 
-  getEnumMembers(
-    enumName: string
-  ): { name: string; value: string | number }[] | undefined {
-    const entry = this.store.getEntryByName(enumName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-
-    let offset = 0;
-    const opCode = buf[offset++];
-    if (opCode !== OpCodes.REF_ENUM) return undefined;
-
-    const fqNameDecode = decodeVarint(buf, offset);
-    offset = fqNameDecode.next;
-
-    const memberDecode = decodeVarint(buf, offset);
-    const memberCount = memberDecode.value;
-    offset = memberDecode.next;
-
-    const result: { name: string; value: string | number }[] = [];
-
-    for (let i = 0; i < memberCount; i++) {
-      const nameIdxDecode = decodeVarint(buf, offset);
-      const nameIdx = nameIdxDecode.value;
-      offset = nameIdxDecode.next;
-
-      // Determine if next field is number (4 bytes) or string (varint length + bytes)
-      let value: string | number;
-      // Check for number optimization: See how you serialized numbers vs strings for enums
-      // If you always write number as 4 bytes, handle accordingly:
-      if (buf[offset] === 0xff) {
-        // Suppose you mark numbers with a 0xFF tag byte (update as per your serializer)
-        value =
-          buf[offset + 1] |
-          (buf[offset + 2] << 8) |
-          (buf[offset + 3] << 16) |
-          (buf[offset + 4] << 24);
-        offset += 5;
-      } else {
-        // By default, read a varint length then the string
-        const strLenDecode = decodeVarint(buf, offset);
-        const strLen = strLenDecode.value;
-        offset = strLenDecode.next;
-        value = new TextDecoder().decode(buf.slice(offset, offset + strLen));
-        offset += strLen;
-      }
-      result.push({ name: this.store.getStrings()[nameIdx], value });
-    }
-    return result;
+  /**
+   * Returns all RTTIPropInfo items of a given kind for a class/interface.
+   * kind: 'property' | 'method' | 'accessor' | 'constructor'
+   */
+  filterPropsOfKind(
+    typeName: string,
+    kind: "property" | "method" | "accessor" | "constructor"
+  ): RTTIPropInfo[] {
+    const props = this.getTypeProperties(typeName) ?? [];
+    return props.filter((p) => (p.kind ?? "property") === kind);
   }
 
-  getGenerics(typeName: string): string[] | undefined {
-    const entry = this.store.getEntryByName(typeName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
+  /**
+   * Returns a single prop/method/accessor by name (and optionally kind) for a class/interface.
+   */
+  findPropByName(
+    typeName: string,
+    name: string,
+    kind?: "property" | "method" | "accessor" | "constructor"
+  ): RTTIPropInfo | undefined {
+    const props = this.getTypeProperties(typeName) ?? [];
+    return props.find(
+      (p) => p.name === name && (kind ? (p.kind ?? "property") === kind : true)
+    );
+  }
 
-    let offset = 0;
-    const opCode = buf[offset++];
-
-    // fqName varint
-    const fqNameDecode = decodeVarint(buf, offset);
-    offset = fqNameDecode.next;
-
-    // skip props or params
-    if (opCode === OpCodes.REF_CLASS) {
-      const propDecode = decodeVarint(buf, offset);
-      const propCount = propDecode.value;
-      offset = propDecode.next;
-      for (let i = 0; i < propCount; i++) {
-        // skip prop (name/type/flags/decorators/params)
-        // see your serializer to determine proper skip logic;
-        // for now, skipping 3 varints per property:
-        for (let v = 0; v < 3; v++) offset = decodeVarint(buf, offset).next;
-        // decorators, params similarly skipped (realistic version would parse/skip those too)
-        let decoCount = decodeVarint(buf, offset).value;
-        for (let d = 0; d < decoCount; d++) {
-          offset = decodeVarint(buf, offset).next; // deco name
-          let argsCt = decodeVarint(buf, offset).value;
-          for (let a = 0; a < argsCt; a++) {
-            offset = decodeVarint(buf, offset).next;
+  /**
+   * Returns all decorators found on the type and all its props/methods/accessors/parameters.
+   */
+  getAllDecoratorsRecursive(typeName: string): RTTIDecorator[] {
+    const decoded = this.getEntryDecoded(typeName);
+    if (!decoded) return [];
+    const all: RTTIDecorator[] = [];
+    if (Array.isArray(decoded.decorators)) all.push(...decoded.decorators);
+    if (Array.isArray(decoded.props)) {
+      for (const prop of decoded.props) {
+        if (Array.isArray(prop.decorators)) all.push(...prop.decorators);
+        if (Array.isArray(prop.parameters)) {
+          for (const param of prop.parameters) {
+            if (Array.isArray(param.decorators)) all.push(...param.decorators);
           }
         }
-        // skip param section
-        const paramCt = decodeVarint(buf, offset).value;
-        for (let p = 0; p < paramCt; p++) {
-          for (let vv = 0; vv < 2; vv++)
-            offset = decodeVarint(buf, offset).next;
-          const pdecoCt = decodeVarint(buf, offset).value;
-          for (let pd = 0; pd < pdecoCt; pd++) {
-            offset = decodeVarint(buf, offset).next;
-            let pdecoArgCt = decodeVarint(buf, offset).value;
-            for (let pa = 0; pa < pdecoArgCt; pa++) {
-              offset = decodeVarint(buf, offset).next;
+        // If method overloads exist:
+        if (Array.isArray(prop.overloads)) {
+          for (const ovl of prop.overloads) {
+            if (Array.isArray(ovl.decorators)) all.push(...ovl.decorators);
+            if (Array.isArray(ovl.params)) {
+              for (const param of ovl.params) {
+                if (Array.isArray(param.decorators))
+                  all.push(...param.decorators);
+              }
             }
           }
         }
       }
-    } else if (opCode === OpCodes.REF_FUNCTION) {
-      const paramDecode = decodeVarint(buf, offset);
-      const paramCount = paramDecode.value;
-      offset = paramDecode.next;
-      for (let i = 0; i < paramCount; i++) {
-        offset = decodeVarint(buf, offset).next; // param name
-        offset = decodeVarint(buf, offset).next; // param type
-        let decoCount = decodeVarint(buf, offset).value;
-        for (let d = 0; d < decoCount; d++) {
-          offset = decodeVarint(buf, offset).next; // deco name
-          let argsCt = decodeVarint(buf, offset).value;
-          for (let a = 0; a < argsCt; a++) {
-            offset = decodeVarint(buf, offset).next;
-          }
-        }
-      }
-      offset = decodeVarint(buf, offset).next; // returnType
-    } else {
-      return undefined;
     }
-
-    // generics varint
-    const genDecode = decodeVarint(buf, offset);
-    const genCt = genDecode.value;
-    offset = genDecode.next;
-
-    const result: string[] = [];
-    for (let i = 0; i < genCt; i++) {
-      const nameIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      result.push(this.store.getStrings()[nameIdx]);
-    }
-    return result;
+    // Optionally deduplicate by name/args
+    return all.filter(
+      (d, i) =>
+        all.findIndex(
+          (x) =>
+            x.name === d.name &&
+            JSON.stringify(x.args) === JSON.stringify(d.args)
+        ) === i
+    );
   }
 
-  getUnionMembers(unionName: string): string[] | undefined {
-    const entry = this.store.getEntryByName(unionName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-    let offset = 0;
-    const opCode = buf[offset++];
-    if (opCode !== OpCodes.REF_UNION) return undefined;
-
-    const fqNameDecode = decodeVarint(buf, offset);
-    offset = fqNameDecode.next;
-    const ctDecode = decodeVarint(buf, offset);
-    const count = ctDecode.value;
-    offset = ctDecode.next;
-
-    const result: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const nameIdxDecode = decodeVarint(buf, offset);
-      result.push(this.store.getStrings()[nameIdxDecode.value]);
-      offset = nameIdxDecode.next;
-    }
-    return result;
+  /**
+   * Returns all overloads for a method of a class/interface.
+   */
+  getMethodOverloads(
+    typeName: string,
+    methodName: string
+  ): RTTIMethodOverload[] | undefined {
+    const prop = this.findPropByName(typeName, methodName, "method");
+    return prop?.overloads;
   }
 
-  getIntersectionMembers(interName: string): string[] | undefined {
-    const entry = this.store.getEntryByName(interName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-    let offset = 0;
-    const opCode = buf[offset++];
-    if (opCode !== OpCodes.REF_INTERSECTION) return undefined;
-
-    const fqNameDecode = decodeVarint(buf, offset);
-    offset = fqNameDecode.next;
-    const ctDecode = decodeVarint(buf, offset);
-    const count = ctDecode.value;
-    offset = ctDecode.next;
-
-    const result: string[] = [];
-    for (let i = 0; i < count; i++) {
-      const nameIdxDecode = decodeVarint(buf, offset);
-      result.push(this.store.getStrings()[nameIdxDecode.value]);
-      offset = nameIdxDecode.next;
-    }
-    return result;
+  /**
+   * Returns all parameters for the primary constructor of a class, if present.
+   */
+  getConstructorParameters(typeName: string): RTTIParameter[] | undefined {
+    const props = this.getTypeProperties(typeName) ?? [];
+    const ctor = props.find((p) => (p.kind ?? "property") === "constructor");
+    return ctor?.parameters;
   }
 
-  getTypePropertiesWithFlags(
-    typeName: string
-  ): { name: string; type: number; flags: number }[] | undefined {
-    const entry = this.store.getEntryByName(typeName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
+  /**
+   * Resolves an RTTITypeRef: returns info about the referenced type.
+   * Returns RTTIMetadata for "ref" types, or the primitive type value for primitives,
+   * or undefined if resolution fails.
+   */
+  resolveTypeRef(
+    typeRef: RTTITypeRef
+  ): RTTIMetadata | PrimitiveType | undefined {
+    if (!typeRef) return undefined;
+    if (typeRef.kind === "primitive") return typeRef.type;
+    if (typeRef.kind === "ref") return this.getEntryDecoded(typeRef.fqName);
+  }
 
-    let offset = 0;
-    const opCode = buf[offset++];
-    if (opCode !== OpCodes.REF_CLASS) return undefined;
-
-    const fqDecode = decodeVarint(buf, offset);
-    offset = fqDecode.next;
-
-    const propDecode = decodeVarint(buf, offset);
-    const propCount = propDecode.value;
-    offset = propDecode.next;
-
-    let props: { name: string; type: number; flags: number }[] = [];
-    for (let i = 0; i < propCount; i++) {
-      const nameIdxDecode = decodeVarint(buf, offset);
-      const nameIdx = nameIdxDecode.value;
-      offset = nameIdxDecode.next;
-
-      const typeDecode = decodeVarint(buf, offset);
-      const typeCode = typeDecode.value;
-      offset = typeDecode.next;
-
-      const flagsDecode = decodeVarint(buf, offset);
-      const flags = flagsDecode.value;
-      offset = flagsDecode.next;
-
-      // Skip member decorators
-      const decoCountDecode = decodeVarint(buf, offset);
-      const decoCount = decoCountDecode.value;
-      offset = decoCountDecode.next;
-      for (let d = 0; d < decoCount; d++) {
-        offset = decodeVarint(buf, offset).next; // deco name
-        const argCount = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let a = 0; a < argCount; a++) {
-          offset = decodeVarint(buf, offset).next;
-        }
-      }
-      // Skip parameters
-      const paramCountDecode = decodeVarint(buf, offset);
-      const paramCount = paramCountDecode.value;
-      offset = paramCountDecode.next;
-      for (let p = 0; p < paramCount; p++) {
-        offset = decodeVarint(buf, offset).next; // param name
-        offset = decodeVarint(buf, offset).next; // param type
-        const paramDecoCount = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let pd = 0; pd < paramDecoCount; pd++) {
-          offset = decodeVarint(buf, offset).next;
-          const argCt = decodeVarint(buf, offset).value;
-          offset = decodeVarint(buf, offset).next;
-          for (let pa = 0; pa < argCt; pa++) {
-            offset = decodeVarint(buf, offset).next;
-          }
-        }
-      }
-
-      const propName = this.store.getStrings()[nameIdx];
-      props.push({ name: propName, type: typeCode, flags });
+  /**
+   * Returns the return type RTTITypeRef for a function.
+   */
+  getFunctionReturnType(funcName: string): RTTITypeRef | undefined {
+    const info = this.getEntryDecoded(funcName);
+    if (info && info.kind === OpCodes.REF_FUNCTION) {
+      return info.returnType;
     }
+    return undefined;
+  }
+
+  /**
+   * Returns all type names of a certain RTTI kind (OpCodes.REF_CLASS, REF_ENUM, etc.)
+   */
+  getAllTypeNamesByKind(kind: OpCodes): string[] {
+    return this.listAllTypes().filter(
+      (typeName) => this.getTypeOpCode(typeName) === kind
+    );
+  }
+
+  /**
+   * Recursively walk all RTTITypeRefs used in the given type's properties, methods, parameters, and generics.
+   * Returns a set of fully-qualified type names referenced (excluding primitives).
+   */
+  getAllReferencedTypes(typeName: string): Set<string> {
+    const visited = new Set<string>();
+    const walkTypeRef = (ref: any) => {
+      if (!ref) return;
+      if (ref.kind === "ref" && typeof ref.fqName === "string") {
+        visited.add(ref.fqName);
+        // recurse into the referenced type itself
+        const refMeta = this.getEntryDecoded(ref.fqName);
+        if (refMeta) walkRTTIMetadata(refMeta);
+      } else if (ref.kind === "primitive") {
+        // skip primitives
+      } else if (Array.isArray(ref.members)) {
+        ref.members.forEach(walkTypeRef);
+      }
+      // ... handle other complex RTTITypeRef shapes as needed
+    };
+    const walkRTTIMetadata = (info: any) => {
+      if (info.props)
+        info.props.forEach((p: any) => {
+          walkTypeRef(p.type);
+          if (p.parameters)
+            p.parameters.forEach((param: any) => walkTypeRef(param.type));
+          if (p.overloads)
+            p.overloads.forEach((ovl: any) => {
+              if (ovl.params)
+                ovl.params.forEach((param: any) => walkTypeRef(param.type));
+              walkTypeRef(ovl.returnType);
+            });
+          if (p.implementation && p.implementation.params)
+            p.implementation.params.forEach((param: any) =>
+              walkTypeRef(param.type)
+            );
+        });
+      if (info.generics)
+        info.generics.forEach((g: any) => {
+          if (g.constraint) walkTypeRef(g.constraint);
+        });
+      if (info.params)
+        info.params.forEach((param: any) => walkTypeRef(param.type));
+      if (info.returnType) walkTypeRef(info.returnType);
+    };
+    const info = this.getEntryDecoded(typeName);
+    if (info) walkRTTIMetadata(info);
+    visited.delete(typeName); // don't include self
+    return visited;
+  }
+
+  /**
+   * Returns a flat, ordered list of all base types (recursively follows extends/implements),
+   * most-ancestral first, direct parent last.
+   */
+  resolveInheritanceTree(typeName: string): string[] {
+    const linearized: string[] = [];
+    const visit = (name: string) => {
+      const bases = this.getBaseTypes(name) ?? [];
+      for (const base of bases) {
+        visit(base);
+      }
+      if (!linearized.includes(name)) linearized.push(name);
+    };
+    visit(typeName);
+    return linearized.filter((n) => n !== typeName); // optional: remove self reference
+  }
+
+  /**
+   * Follows a property path and returns the final RTTITypeRef, or undefined if path is invalid.
+   */
+  getPropertyTypeByPath(
+    typeName: string,
+    path: string
+  ): RTTITypeRef | undefined {
+    let type = typeName;
+    let ref: RTTITypeRef | undefined;
+    const segments = path.split(".");
+    for (const key of segments) {
+      const props = this.getTypeProperties(type);
+      const prop = props?.find((p) => p.name === key);
+      if (!prop) return undefined;
+      ref = prop.type;
+      if (ref.kind === "ref") {
+        type = ref.fqName;
+      } else if (ref.kind === "primitive") {
+        return ref;
+      } else {
+        return undefined; // not supported for other types yet
+      }
+    }
+    return ref;
+  }
+
+  /**
+   * Instantiates an empty/default object matching the schema of the class/interface,
+   * with properties filled as undefined/null/empty arrays, etc.
+   * (This is a simple blueprint, not hydration with data.)
+   */
+  instantiateDefaultObject(typeName: string): any {
+    const props = this.getTypeProperties(typeName);
+    if (!props) return {};
+    const res: any = {};
+    for (const p of props) {
+      if (p.kind === "method" || p.kind === "constructor") continue;
+      const t = p.type;
+      if (t.kind === "primitive") {
+        // customize these mappings as you wish
+        switch (t.type) {
+          case 1:
+            res[p.name] = 0;
+            break; // number
+          case 2:
+            res[p.name] = "";
+            break; // string
+          case 3 as PrimitiveType:
+            res[p.name] = false;
+            break; // boolean
+          default:
+            res[p.name] = null;
+            break;
+        }
+      } else if (t.kind === "ref") {
+        res[p.name] = undefined; // or recursively .instantiateDefaultObject(t.fqName)
+      }
+    }
+    return res;
+  }
+
+  /**
+   * Returns true if `typeName` is a subclass/subinterface (directly or indirectly) of `baseType`.
+   */
+  isSubclassOf(typeName: string, baseType: string): boolean {
+    const allBases = this.resolveInheritanceTree(typeName);
+    return allBases.includes(baseType);
+  }
+
+  /**
+   * Human-friendly single-line type ref summary. Useful for docs, debug, UI.
+   */
+  prettyPrintTypeRef(ref: RTTITypeRef): string {
+    if (ref.kind === "primitive") return String(ref.type);
+    if (ref.kind === "ref") return `[${ref.fqName}]`;
+    return "<unknown>";
+  }
+
+  /**
+   * Returns all property names for the given type and all its base types (depth-first, including duplicates).
+   */
+  getAllPropertiesRecursive(typeName: string): string[] {
+    const props: string[] = [];
+    const scan = (name: string) => {
+      const typeProps = this.getTypeProperties(name);
+      if (typeProps)
+        props.push(
+          ...typeProps.filter((p) => p.kind === "property").map((p) => p.name)
+        );
+      const bases = this.getBaseTypes(name);
+      if (bases) bases.forEach(scan);
+    };
+    scan(typeName);
     return props;
   }
 
-  getDecorators(
-    typeName: string
-  ): { name: string; args: string[] }[] | undefined {
-    const entry = this.store.getEntryByName(typeName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
+  // === Primitive Helper Methods ===
 
-    let offset = 0;
-    const op = buf[offset++];
-
-    // fqName
-    offset = decodeVarint(buf, offset).next;
-
-    // Skip to decorators block:
-    if (op === OpCodes.REF_CLASS) {
-      const propCt = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      for (let i = 0; i < propCt; i++) {
-        // for each property: skip name, type, flags, decorators, parameters (see serializer layout)
-        for (let v = 0; v < 3; v++) offset = decodeVarint(buf, offset).next;
-        let decoCount = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let d = 0; d < decoCount; d++) {
-          offset = decodeVarint(buf, offset).next;
-          let argsCt = decodeVarint(buf, offset).value;
-          offset = decodeVarint(buf, offset).next;
-          for (let a = 0; a < argsCt; a++) {
-            offset = decodeVarint(buf, offset).next;
-          }
-        }
-        const paramCt = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let p = 0; p < paramCt; p++) {
-          offset = decodeVarint(buf, offset).next;
-          offset = decodeVarint(buf, offset).next;
-          let pc = decodeVarint(buf, offset).value;
-          offset = decodeVarint(buf, offset).next;
-          for (let pd = 0; pd < pc; pd++) {
-            offset = decodeVarint(buf, offset).next;
-            let pac = decodeVarint(buf, offset).value;
-            offset = decodeVarint(buf, offset).next;
-            for (let pda = 0; pda < pac; pda++) {
-              offset = decodeVarint(buf, offset).next;
-            }
-          }
-        }
-      }
-    } else if (op === OpCodes.REF_FUNCTION) {
-      const paramCt = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      for (let i = 0; i < paramCt; i++) {
-        offset = decodeVarint(buf, offset).next;
-        offset = decodeVarint(buf, offset).next;
-        let pc = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let d = 0; d < pc; d++) {
-          offset = decodeVarint(buf, offset).next;
-          let argCt = decodeVarint(buf, offset).value;
-          offset = decodeVarint(buf, offset).next;
-          for (let k = 0; k < argCt; k++) {
-            offset = decodeVarint(buf, offset).next;
-          }
-        }
-      }
-      offset = decodeVarint(buf, offset).next; // returnType
-    } else {
-      return undefined;
-    }
-
-    // Generics
-    const genCt = decodeVarint(buf, offset).value;
-    offset = decodeVarint(buf, offset).next;
-    for (let i = 0; i < genCt; i++) offset = decodeVarint(buf, offset).next;
-
-    // Now at decorators block
-    const decoCount = decodeVarint(buf, offset).value;
-    offset = decodeVarint(buf, offset).next;
-    const result: { name: string; args: string[] }[] = [];
-    for (let i = 0; i < decoCount; i++) {
-      const nameIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const argCount = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const args: string[] = [];
-      for (let j = 0; j < argCount; j++) {
-        const argIdx = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        args.push(this.store.getStrings()[argIdx]);
-      }
-      result.push({ name: this.store.getStrings()[nameIdx], args });
-    }
-    return result;
+  /**
+   * Returns true if the type is a class (OpCodes.REF_CLASS).
+   */
+  isClass(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_CLASS;
   }
 
-  getFunctionParamsWithDecorators(funcName: string):
-    | {
-        name: string;
-        type: number;
-        decorators: { name: string; args: string[] }[];
-      }[]
-    | undefined {
-    const entry = this.store.getEntryByName(funcName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-
-    let offset = 0;
-    const op = buf[offset++];
-    if (op !== OpCodes.REF_FUNCTION) return undefined;
-
-    offset = decodeVarint(buf, offset).next;
-
-    const paramCtDecode = decodeVarint(buf, offset);
-    const paramCount = paramCtDecode.value;
-    offset = paramCtDecode.next;
-
-    const params: {
-      name: string;
-      type: number;
-      decorators: { name: string; args: string[] }[];
-    }[] = [];
-    for (let i = 0; i < paramCount; i++) {
-      const nameIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const typeCode = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const decoCount = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const decorators: { name: string; args: string[] }[] = [];
-      for (let j = 0; j < decoCount; j++) {
-        const decoNameIdx = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        const argCount = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        const args: string[] = [];
-        for (let k = 0; k < argCount; k++) {
-          const argIdx = decodeVarint(buf, offset).value;
-          offset = decodeVarint(buf, offset).next;
-          args.push(this.store.getStrings()[argIdx]);
-        }
-        decorators.push({ name: this.store.getStrings()[decoNameIdx], args });
-      }
-      params.push({
-        name: this.store.getStrings()[nameIdx],
-        type: typeCode,
-        decorators,
-      });
-    }
-    return params;
+  /**
+   * Returns true if the type is an interface (OpCodes.REF_OBJECT).
+   */
+  isInterface(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_OBJECT;
   }
 
-  getBaseTypes(typeName: string): string[] | undefined {
-    const entry = this.store.getEntryByName(typeName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-
-    let offset = 0;
-    const opCode = buf[offset++];
-
-    // fqName
-    offset = decodeVarint(buf, offset).next;
-
-    if (opCode === OpCodes.REF_CLASS) {
-      // skip all type properties, as in getTypePropertiesWithFlags above
-      const propDecode = decodeVarint(buf, offset);
-      const propCt = propDecode.value;
-      offset = propDecode.next;
-      for (let i = 0; i < propCt; i++) {
-        for (let v = 0; v < 3; v++) offset = decodeVarint(buf, offset).next;
-        let decoCount = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let d = 0; d < decoCount; d++) {
-          offset = decodeVarint(buf, offset).next;
-          let argsCt = decodeVarint(buf, offset).value;
-          offset = decodeVarint(buf, offset).next;
-          for (let a = 0; a < argsCt; a++) {
-            offset = decodeVarint(buf, offset).next;
-          }
-        }
-        const paramCt = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let p = 0; p < paramCt; p++) {
-          offset = decodeVarint(buf, offset).next;
-          offset = decodeVarint(buf, offset).next;
-          let pc = decodeVarint(buf, offset).value;
-          offset = decodeVarint(buf, offset).next;
-          for (let pd = 0; pd < pc; pd++) {
-            offset = decodeVarint(buf, offset).next;
-            let pac = decodeVarint(buf, offset).value;
-            offset = decodeVarint(buf, offset).next;
-            for (let pda = 0; pda < pac; pda++) {
-              offset = decodeVarint(buf, offset).next;
-            }
-          }
-        }
-      }
-      // generics
-      const genCt = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      for (let i = 0; i < genCt; i++) offset = decodeVarint(buf, offset).next;
-      // decorators
-      const decoCt = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      for (let d = 0; d < decoCt; d++) {
-        offset = decodeVarint(buf, offset).next;
-        let argCt = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        for (let a = 0; a < argCt; a++) {
-          offset = decodeVarint(buf, offset).next;
-        }
-      }
-    }
-    // Now at bases block:
-    const baseCount = decodeVarint(buf, offset).value;
-    offset = decodeVarint(buf, offset).next;
-    const bases: string[] = [];
-    for (let i = 0; i < baseCount; i++) {
-      const baseIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      bases.push(this.store.getStrings()[baseIdx]);
-    }
-    return bases;
+  /**
+   * Returns true if the type is an enum (OpCodes.REF_ENUM).
+   */
+  isEnum(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_ENUM;
   }
 
-  getEntryDecoded(typeName: string): any | undefined {
-    const entry = this.store.getEntryByName(typeName);
-    if (!entry) return undefined;
-    const buf = this.store.getMetadataBuffer(entry);
-    return decodeRTTIEntry(buf, (idx) => this.store.getStrings()[idx]);
+  /**
+   * Returns true if the given name is a function (OpCodes.REF_FUNCTION).
+   */
+  isFunction(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_FUNCTION;
   }
+
+  /**
+   * Returns true if the type is a union type (OpCodes.REF_UNION).
+   */
+  isUnion(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_UNION;
+  }
+
+  /**
+   * Returns true if the type is an intersection type (OpCodes.REF_INTERSECTION).
+   */
+  isIntersection(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_INTERSECTION;
+  }
+
+  /**
+   * Returns true if the type is a mapped type (OpCodes.REF_MAPPED).
+   */
+  isMappedType(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_MAPPED;
+  }
+
+  /**
+   * Returns true if the type is a conditional type (OpCodes.REF_CONDITIONAL).
+   */
+  isConditionalType(typeName: string): boolean {
+    return this.getTypeOpCode(typeName) === OpCodes.REF_CONDITIONAL;
+  }
+
+  /**
+   * Returns true if the RTTITypeRef is a primitive.
+   */
+  isPrimitiveType(typeRef: RTTITypeRef): boolean {
+    return !!typeRef && typeRef.kind === "primitive";
+  }
+
+  /**
+   * Returns true if the RTTITypeRef is a reference type (RTTITypeRef.kind === 'ref').
+   */
+  isReferenceType(typeRef: RTTITypeRef): boolean {
+    return !!typeRef && typeRef.kind === "ref";
+  }
+
+  /**
+   * Returns true if your RTTI metadata marks this type as exported.
+   * (You must collect/export this info during RTTI extraction phase.)
+   */
+  isExported(typeName: string): boolean {
+    const decoded = this.getEntryDecoded(typeName);
+    return !!decoded && decoded.exported === true;
+  }
+
+  /**
+   * Returns a human-friendly kind string for a type.
+   */
+  getKindString(typeName: string): string {
+    const kind = this.getTypeOpCode(typeName);
+    switch (kind) {
+      case OpCodes.REF_CLASS:
+        return "class";
+      case OpCodes.REF_OBJECT:
+        return "interface";
+      case OpCodes.REF_FUNCTION:
+        return "function";
+      case OpCodes.REF_GENERIC:
+        return "generic";
+      case OpCodes.REF_UNION:
+        return "union";
+      case OpCodes.REF_INTERSECTION:
+        return "intersection";
+      case OpCodes.REF_ENUM:
+        return "enum";
+      case OpCodes.REF_PRIMITIVE:
+        return "primitive";
+      case OpCodes.REF_MAPPED:
+        return "mapped";
+      case OpCodes.REF_CONDITIONAL:
+        return "conditional";
+      case OpCodes.REF_LITERAL:
+        return "literal";
+      case OpCodes.REF_ALIAS:
+        return "alias";
+      case undefined:
+        return "<unknown>";
+      default:
+        return String(kind);
+    }
+  }
+
+  /**
+   * Returns all static method members of a class or interface.
+   */
+  getStaticMethods(typeName: string): RTTIPropInfo[] {
+    return (this.getTypeProperties(typeName) ?? []).filter(
+      (p) =>
+        (p.kind ?? "property") === "method" &&
+        Introspector.isStatic(p.flags ?? 0)
+    );
+  }
+
+  /**
+   * Returns all instance method members of a class or interface.
+   */
+  getInstanceMethods(typeName: string): RTTIPropInfo[] {
+    return (this.getTypeProperties(typeName) ?? []).filter(
+      (p) =>
+        (p.kind ?? "property") === "method" &&
+        !Introspector.isStatic(p.flags ?? 0)
+    );
+  }
+
+  /**
+   * Returns all method names (instance and static) for a type.
+   */
+  getAllMethodNames(typeName: string): string[] {
+    return (this.getTypeProperties(typeName) ?? [])
+      .filter((p) => (p.kind ?? "property") === "method")
+      .map((p) => p.name);
+  }
+
+  /**
+   * Returns true if the type has any top-level decorators.
+   */
+  hasTypeDecorators(typeName: string): boolean {
+    const decs = this.getDecorators(typeName);
+    return !!(decs && decs.length > 0);
+  }
+
+  /**
+   * Returns true if a property or method (RTTIPropInfo) has decorators.
+   */
+  static hasPropDecorators(prop: RTTIPropInfo): boolean {
+    return !!(prop.decorators && prop.decorators.length > 0);
+  }
+
+  /**
+   * Returns all instance properties for a type (excluding static, methods, accessors, etc).
+   */
+  getAllInstanceProperties(typeName: string): RTTIPropInfo[] {
+    return (this.getTypeProperties(typeName) ?? []).filter(
+      (p) =>
+        (p.kind ?? "property") === "property" &&
+        !Introspector.isStatic(p.flags ?? 0)
+    );
+  }
+
+  /**
+   * Returns all static properties for a type.
+   */
+  getAllStaticProperties(typeName: string): RTTIPropInfo[] {
+    return (this.getTypeProperties(typeName) ?? []).filter(
+      (p) =>
+        (p.kind ?? "property") === "property" &&
+        Introspector.isStatic(p.flags ?? 0)
+    );
+  }
+
+  /**
+   * Returns true if the given type has a method with the given name (instance or static).
+   */
+  hasMethod(typeName: string, methodName: string): boolean {
+    return (this.getTypeProperties(typeName) ?? [])
+      .filter((p) => (p.kind ?? "property") === "method")
+      .some((p) => p.name === methodName);
+  }
+
+  /**
+   * Returns true if the given type has a property (field, not method/accessor) with the given name.
+   */
+  hasProperty(typeName: string, propName: string): boolean {
+    return (this.getTypeProperties(typeName) ?? [])
+      .filter((p) => (p.kind ?? "property") === "property")
+      .some((p) => p.name === propName);
+  }
+
+  /**
+   * Returns the parameter names for a given method of a class/interface.
+   */
+  getParameterNames(
+    typeName: string,
+    methodName: string
+  ): string[] | undefined {
+    const method = (this.getTypeProperties(typeName) ?? []).find(
+      (p) => (p.kind ?? "property") === "method" && p.name === methodName
+    );
+    if (!method) return undefined;
+    // Prefer implementation, then overloads, then parameters.
+    if (method.implementation && method.implementation.params)
+      return method.implementation.params.map((p) => p.name);
+    if (method.overloads && method.overloads[0]?.params)
+      return method.overloads[0].params.map((p) => p.name);
+    if (Array.isArray(method.parameters))
+      return method.parameters.map((p) => p.name);
+    return [];
+  }
+
+  /**
+   * Returns true if a particular flag bit is set in a flags word.
+   * Example: Introspector.isFlagSet(flags, 3) // is private?
+   */
+  static isFlagSet(flags: number, bitIndex: number): boolean {
+    return (flags & (1 << bitIndex)) !== 0;
+  }
+
+  /**
+   * Returns all accessors (get/set) for a type.
+   */
+  getAllAccessors(typeName: string): RTTIPropInfo[] {
+    return (this.getTypeProperties(typeName) ?? []).filter(
+      (p) => (p.kind ?? "property") === "accessor"
+    );
+  }
+
+  // === Flag utilities ===
 
   static decodeVisibility(flags: number): "public" | "private" | "protected" {
     if (flags & (1 << 3)) return "private";
     if (flags & (1 << 4)) return "protected";
     return "public";
   }
-
   static isStatic(flags: number): boolean {
     return (flags & (1 << 0)) !== 0;
   }
@@ -641,59 +679,5 @@ export class Introspector {
     return (flags & (1 << 2)) !== 0;
   }
 }
-
-export function decodeVisibility(
-  flags: number
-): "public" | "private" | "protected" {
-  if (flags & (1 << 3)) return "private";
-  if (flags & (1 << 4)) return "protected";
-  return "public";
-}
-
-// ======= Demo & Testing Entry Point =======
-async function demoIntrospection() {
-  const store = new MetadataStore();
-  await store.load("metadata.bin");
-  const introspect = new Introspector(store);
-
-  console.log("*** All RTTI Types/Functions:");
-  introspect.listAllTypes().forEach((name) => {
-    const op = introspect.getTypeOpCode(name);
-    console.log(`• ${name}: ${OpCodes[op!] ?? op}`);
-  });
-
-  // Show properties for all classes
-  introspect.listAllTypes().forEach((name) => {
-    if (introspect.getTypeOpCode(name) === OpCodes.REF_CLASS) {
-      const props = introspect.getTypeProperties(name)!;
-      console.log(`Class ${name} props:`);
-      props.forEach((p) =>
-        console.log(`  ${p.name} (${PrimitiveTypes[p.type] ?? p.type})`)
-      );
-    }
-  });
-
-  // Show params for all functions
-  introspect.listAllTypes().forEach((name) => {
-    if (introspect.getTypeOpCode(name) === OpCodes.REF_FUNCTION) {
-      const params = introspect.getFunctionParams(name)!;
-      console.log(`Function ${name} params:`);
-      params.forEach((p) =>
-        console.log(`  ${p.name} (${PrimitiveTypes[p.type] ?? p.type})`)
-      );
-    }
-  });
-
-  // Advanced: Raw metadata buffer dump
-  introspect.listAllTypes().forEach((name) => {
-    const raw = introspect.getRawMetadata(name);
-    if (raw) {
-      console.log(`Raw metadata for ${name}:`, raw);
-    }
-  });
-}
-
-// Uncomment below to run a test after build:
-// demoIntrospection();
 
 export default Introspector;

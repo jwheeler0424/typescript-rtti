@@ -1,3 +1,6 @@
+import { Hydrator } from "../tools/hydrator";
+import Introspector from "../tools/introspect";
+import { MetadataStore } from "../tools/reader";
 // Entrypoint for runtime usage demo (will use Hydrator/readers later)
 console.log("TypeScript RTTI runtime system starting...");
 
@@ -196,3 +199,28 @@ console.log("TypeScript RTTI runtime system starting...");
   }
   console.log(obj.myValue);
 }
+
+(async () => {
+  const store = new MetadataStore();
+  await store.load("metadata.bin");
+
+  const introspector = new Introspector(store);
+
+  // List all types
+  const allTypes = introspector.listAllTypes();
+
+  // Get class properties with types
+  const props = introspector.getTypeProperties("User");
+  console.log("User properties:", props);
+
+  // Hydrate an object against a class schema
+  await Hydrator.init("metadata.bin");
+  const hydrated = Hydrator.hydrate(
+    "MyClass",
+    { foo: 123, bar: "hello" },
+    true
+  );
+
+  // Get function signatures (params, return type)
+  const sig = Hydrator.getFunctionSignature("myFunction");
+})();

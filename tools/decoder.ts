@@ -1,5 +1,5 @@
 import { decodeVarint, OpCode } from "./protocol";
-import { PrimitiveType, RTTITypeRef } from "./types";
+import type { PrimitiveType, RTTITypeRef } from "./types";
 
 // --- RTTITypeRef decoder helper ---
 function decodeRTTITypeRef(
@@ -269,11 +269,15 @@ export function decodeRTTIEntry(
         offset = decodeVarint(buf, offset).next;
         let value: string | number;
         if (buf[offset] === 0xff) {
-          value =
-            buf[offset + 1] |
-            (buf[offset + 2] << 8) |
-            (buf[offset + 3] << 16) |
-            (buf[offset + 4] << 24);
+          // ensure there are 4 more bytes available for the 32-bit value
+          if (offset + 4 >= buf.length) {
+            throw new Error(
+              "Unexpected end of buffer while reading enum numeric value"
+            );
+          }
+          // read 32-bit little-endian signed integer from the following 4 bytes
+          const view = new DataView(buf.buffer, buf.byteOffset + offset + 1, 4);
+          value = view.getInt32(0, true);
           offset += 5;
         } else {
           const strLenDecode = decodeVarint(buf, offset);

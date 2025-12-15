@@ -8,7 +8,10 @@ import { RTTISerializer } from "./serializer";
 import type {
   MetadataCache,
   PrimitiveType,
+  RTTIClassMetadata,
   RTTIDecorator,
+  RTTIEnumMetadata,
+  RTTIFunctionMetadata,
   RTTIMetadata,
   RTTIParameter,
   RTTIPropInfo,
@@ -46,11 +49,113 @@ function fqNameFromNode(node: ts.Node, sourceFile: ts.SourceFile): string {
   return name;
 }
 
+function extractInterfaceMetadata(
+  node: ts.InterfaceDeclaration,
+  typeChecker: ts.TypeChecker,
+  sourceFile: ts.SourceFile
+): RTTIClassMetadata {
+  const fqName = fqNameFromNode(node, sourceFile);
+
+  // Extract 'extends' (heritage)
+  const bases: string[] = [];
+  if (node.heritageClauses) {
+    for (const hc of node.heritageClauses) {
+      if (hc.token === ts.SyntaxKind.ExtendsKeyword) {
+        hc.types.forEach((h) => {
+          bases.push(h.expression.getText(sourceFile));
+        });
+      }
+    }
+  }
+
+  // Extract properties and methods
+  const props: RTTIPropInfo[] = [];
+  for (const member of node.members) {
+    // Properties: PropertySignature
+    if (
+      ts.isPropertySignature(member) &&
+      member.name &&
+      ts.isIdentifier(member.name)
+    ) {
+      const name = member.name.text;
+      const typeObj = member.type
+        ? typeChecker.getTypeFromTypeNode(member.type)
+        : typeChecker.getTypeAtLocation(member);
+      let flags = 0;
+      if ("questionToken" in member && member.questionToken) flags |= 1 << 2; // optional
+
+      const propDecorators: RTTIDecorator[] = [];
+      props.push({
+        name,
+        kind: "property",
+        type: getPrimitive(typeObj),
+        flags,
+        decorators: propDecorators,
+      });
+    }
+    // Methods: MethodSignature
+    if (
+      ts.isMethodSignature(member) &&
+      member.name &&
+      ts.isIdentifier(member.name)
+    ) {
+      const name = member.name.text;
+      const parameters = member.parameters.map((param) => {
+        const pname = param.name.getText(sourceFile);
+        let pType = Primitive.Unknown;
+        if (param.type) {
+          const typeObj = typeChecker.getTypeFromTypeNode(param.type);
+          pType = getPrimitive(typeObj);
+        }
+
+        const paramDecorators: RTTIDecorator[] = [];
+
+        return {
+          name: pname,
+          type: pType,
+          decorators: paramDecorators,
+        };
+      });
+
+      const methodDecorators: RTTIDecorator[] = [];
+      props.push({
+        name,
+        kind: "method",
+        type: Primitive.Unknown, // you may enhance to use method return type if desired
+        flags: 0,
+        decorators: methodDecorators,
+        parameters,
+      });
+    }
+    // (No accessors or constructors in interfaces)
+  }
+
+  // Generics
+  const generics: string[] = node.typeParameters
+    ? node.typeParameters.map((tp) => tp.name.text)
+    : [];
+
+  // Decorators (rare on interfaces, but possible with TS plugin support)
+  const decorators: RTTIDecorator[] = [];
+  node.forEachChild((child) => {
+    if (ts.isDecorator(child)) {
+      const decorator = extractDecorator(child, sourceFile);
+      if (decorator) decorators.push(decorator);
+    }
+  });
+
+  return {
+    fqName,
+    kind: OpCode.REF_OBJECT, // Still using REF_OBJECT for interfaces
+    data: { props, generics, decorators, bases },
+  };
+}
+
 function extractClassMetadata(
   node: ts.ClassDeclaration,
   typeChecker: ts.TypeChecker,
   sourceFile: ts.SourceFile
-): RTTIMetadata {
+): RTTIClassMetadata {
   const fqName = fqNameFromNode(node, sourceFile);
   const props: RTTIPropInfo[] = [];
 
@@ -97,7 +202,6 @@ function extractClassMetadata(
       )
         flags |= 1 << 4;
 
-      // TODO: extract property decorators
       const propDecorators: RTTIDecorator[] = [];
       member.forEachChild((child) => {
         if (ts.isDecorator(child)) {
@@ -141,7 +245,7 @@ function extractClassMetadata(
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
           pType = getPrimitive(typeObj);
         }
-        // TODO: extract parameter decorators
+
         const parameterDecorators: RTTIDecorator[] = [];
         param.forEachChild((child) => {
           if (ts.isDecorator(child)) {
@@ -157,7 +261,6 @@ function extractClassMetadata(
       });
 
       // Special: get return type for methods if required. Here just storing params.
-      // TODO extract method decorators
       const methodDecorators: RTTIDecorator[] = [];
       member.forEachChild((child) => {
         if (ts.isDecorator(child)) {
@@ -200,7 +303,7 @@ function extractClassMetadata(
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
           pType = getPrimitive(typeObj);
         }
-        // TODO: extract parameter decorators
+
         const parameterDecorators: RTTIDecorator[] = [];
         param.forEachChild((child) => {
           if (ts.isDecorator(child)) {
@@ -214,7 +317,7 @@ function extractClassMetadata(
           decorators: parameterDecorators,
         };
       });
-      // TODO: extract property decorators
+
       const propDecorators: RTTIDecorator[] = [];
       member.forEachChild((child) => {
         if (ts.isDecorator(child)) {
@@ -241,7 +344,7 @@ function extractClassMetadata(
           const typeObj = typeChecker.getTypeFromTypeNode(param.type);
           pType = getPrimitive(typeObj);
         }
-        // TODO: extract parameter decorators
+
         const parameterDecorators: RTTIDecorator[] = [];
         param.forEachChild((child) => {
           if (ts.isDecorator(child)) {
@@ -303,7 +406,7 @@ function extractClassMetadata(
             const typeObj = typeChecker.getTypeFromTypeNode(param.type);
             pType = getPrimitive(typeObj);
           }
-          // TODO: extract property decorators
+
           const propDecorators: RTTIDecorator[] = [];
           member.forEachChild((child) => {
             if (ts.isDecorator(child)) {
@@ -326,7 +429,7 @@ function extractClassMetadata(
   const generics: string[] = node.typeParameters
     ? node.typeParameters.map((tp) => tp.name.text)
     : [];
-  // TODO: extract class decorators
+
   const decorators: RTTIDecorator[] = [];
   node.forEachChild((child) => {
     if (ts.isDecorator(child)) {
@@ -345,7 +448,7 @@ function extractFunctionMetadata(
   node: ts.FunctionDeclaration,
   typeChecker: ts.TypeChecker,
   sourceFile: ts.SourceFile
-): RTTIMetadata {
+): RTTIFunctionMetadata {
   const fqName = fqNameFromNode(node, sourceFile);
   // Parameters
   const params: RTTIParameter[] = [];
@@ -370,18 +473,37 @@ function extractFunctionMetadata(
     ? node.typeParameters.map((tp) => tp.name.text)
     : [];
 
-  // TODO: extract function decorators
-  const decorators: RTTIDecorator[] = [];
-  node.forEachChild((child) => {
-    if (ts.isDecorator(child)) {
-      const decorator = extractDecorator(child, sourceFile);
-      if (decorator) decorators.push(decorator);
-    }
-  });
   return {
     fqName,
     kind: OpCode.REF_FUNCTION,
-    data: { params, returnType, generics, decorators },
+    data: { params, returnType, generics },
+  };
+}
+
+function extractEnumMetadata(
+  node: ts.EnumDeclaration,
+  sourceFile: ts.SourceFile
+): RTTIEnumMetadata {
+  const fqName = fqNameFromNode(node, sourceFile);
+  const members: { name: string; value: string | number }[] = [];
+  node.members.forEach((member) => {
+    const name = member.name.getText(sourceFile);
+    let value: string | number = members.length;
+    if (member.initializer) {
+      if (ts.isNumericLiteral(member.initializer)) {
+        value = Number(member.initializer.text);
+      } else if (ts.isStringLiteral(member.initializer)) {
+        value = member.initializer.text;
+      } else {
+        value = member.initializer.getText(sourceFile);
+      }
+    }
+    members.push({ name, value });
+  });
+  return {
+    fqName,
+    kind: OpCode.REF_ENUM,
+    data: { members },
   };
 }
 
@@ -449,103 +571,10 @@ async function main(): Promise<void> {
     let typesForThisFile: RTTIMetadata[] = [];
     let typeHashes: Record<string, string> = {};
     ts.forEachChild(sourceFile, (node) => {
-      let meta: RTTIMetadata | undefined;
+      let meta: RTTIMetadata | null = null;
       // === INTERFACE EXTRACTION ===
       if (ts.isInterfaceDeclaration(node) && node.name) {
-        const fqName = fqNameFromNode(node, sourceFile);
-
-        // Extract 'extends' (heritage)
-        const bases: string[] = [];
-        if (node.heritageClauses) {
-          for (const hc of node.heritageClauses) {
-            if (hc.token === ts.SyntaxKind.ExtendsKeyword) {
-              hc.types.forEach((h) => {
-                bases.push(h.expression.getText(sourceFile));
-              });
-            }
-          }
-        }
-
-        // Extract properties and methods
-        const props: RTTIPropInfo[] = [];
-        for (const member of node.members) {
-          // Properties: PropertySignature
-          if (
-            ts.isPropertySignature(member) &&
-            member.name &&
-            ts.isIdentifier(member.name)
-          ) {
-            const name = member.name.text;
-            const typeObj = member.type
-              ? typeChecker.getTypeFromTypeNode(member.type)
-              : typeChecker.getTypeAtLocation(member);
-            let flags = 0;
-            if ("questionToken" in member && member.questionToken)
-              flags |= 1 << 2; // optional
-
-            // TODO: extract property decorators
-            const propDecorators: RTTIDecorator[] = [];
-            props.push({
-              name,
-              kind: "property",
-              type: getPrimitive(typeObj),
-              flags,
-              decorators: propDecorators,
-            });
-          }
-          // Methods: MethodSignature
-          if (
-            ts.isMethodSignature(member) &&
-            member.name &&
-            ts.isIdentifier(member.name)
-          ) {
-            const name = member.name.text;
-            const parameters = member.parameters.map((param) => {
-              const pname = param.name.getText(sourceFile);
-              let pType = Primitive.Unknown;
-              if (param.type) {
-                const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-                pType = getPrimitive(typeObj);
-              }
-
-              // TODO: extract parameter decorators
-              const paramDecorators: RTTIDecorator[] = [];
-
-              return {
-                name: pname,
-                type: pType,
-                decorators: paramDecorators,
-              };
-            });
-
-            // TODO: extract method decorators
-            const methodDecorators: RTTIDecorator[] = [];
-            props.push({
-              name,
-              kind: "method",
-              type: Primitive.Unknown, // you may enhance to use method return type if desired
-              flags: 0,
-              decorators: methodDecorators,
-              parameters,
-            });
-          }
-          // (No accessors or constructors in interfaces)
-        }
-
-        // Generics
-        const generics: string[] = node.typeParameters
-          ? node.typeParameters.map((tp) => tp.name.text)
-          : [];
-
-        // Decorators (rare on interfaces, but possible with TS plugin support)
-        // TODO: extract interface decorators
-        const decorators: RTTIDecorator[] = [];
-
-        meta = {
-          fqName,
-          kind: OpCode.REF_OBJECT, // Still using REF_OBJECT for interfaces
-          data: { props, generics, decorators, bases },
-        };
+        meta = extractInterfaceMetadata(node, typeChecker, sourceFile);
       }
 
       // === CLASS EXTRACTION ===
@@ -560,27 +589,7 @@ async function main(): Promise<void> {
 
       // === ENUM EXTRACTION ===
       if (ts.isEnumDeclaration(node)) {
-        const fqName = fqNameFromNode(node, sourceFile);
-        const members: { name: string; value: string | number }[] = [];
-        node.members.forEach((member) => {
-          const name = member.name.getText(sourceFile);
-          let value: string | number = members.length;
-          if (member.initializer) {
-            if (ts.isNumericLiteral(member.initializer)) {
-              value = Number(member.initializer.text);
-            } else if (ts.isStringLiteral(member.initializer)) {
-              value = member.initializer.text;
-            } else {
-              value = member.initializer.getText(sourceFile);
-            }
-          }
-          members.push({ name, value });
-        });
-        meta = {
-          fqName,
-          kind: OpCode.REF_ENUM,
-          data: { members },
-        };
+        meta = extractEnumMetadata(node, sourceFile);
       }
 
       if (ts.isTypeAliasDeclaration(node)) {

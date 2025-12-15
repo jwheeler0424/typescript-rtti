@@ -16,6 +16,7 @@
     "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
+    "experimentalDecorators": false,
 
     // Stricter Typechecking Options
     "noUncheckedIndexedAccess": true,

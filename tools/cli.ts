@@ -1,6 +1,7 @@
 import fs from "fs";
 import lz4 from "lz4js";
 import { decodeRTTIEntry } from "./decoder";
+import { prettyPrintRTTIEntry } from "./printer";
 
 function decodeHeader(buf: Buffer) {
   return {
@@ -83,7 +84,8 @@ async function main(): Promise<void> {
       entry.dataOffset + entry.dataLength
     );
     const decoded = decodeRTTIEntry(buf, (idx) => strings[idx]);
-    console.log(`[${entry.fqName}]:`, JSON.stringify(decoded, null, 2));
+    console.log(prettyPrintRTTIEntry(decoded, entry.fqName) + "\n");
+    // console.log(`[${entry.fqName}]:`, JSON.stringify(decoded, null, 2));
   });
 
   console.log("Done.");

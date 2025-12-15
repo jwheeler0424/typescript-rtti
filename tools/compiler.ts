@@ -3,6 +3,7 @@ import fs from "fs";
 import lz4 from "lz4js";
 import path from "path";
 import ts from "typescript";
+import { extractTypeRTTI, RTTIExtractContext } from "./extractor";
 import { OpCode, Primitive } from "./protocol";
 import { RTTISerializer } from "./serializer";
 import type {
@@ -12,7 +13,9 @@ import type {
   RTTIDecorator,
   RTTIEnumMetadata,
   RTTIFunctionMetadata,
+  RTTIGenericParam,
   RTTIMetadata,
+  RTTIMethodOverload,
   RTTIParameter,
   RTTIPropInfo,
 } from "./types";
@@ -37,24 +40,29 @@ function getPrimitive(type: ts.Type): PrimitiveType {
   return Primitive.Unknown;
 }
 
-function fqNameFromNode(node: ts.Node, sourceFile: ts.SourceFile): string {
-  const name =
-    (
-      node as
-        | ts.ClassDeclaration
-        | ts.FunctionDeclaration
-        | ts.InterfaceDeclaration
-        | ts.EnumDeclaration
-    ).name?.getText(sourceFile) ?? "anonymous";
-  return name;
+function getCanonicalFqName(node: ts.Node, checker: ts.TypeChecker): string {
+  // Works on symbols from declarations as well as on types
+  let symbol: ts.Symbol | undefined = (node as any).symbol;
+  if (!symbol && ts.isTypeAliasDeclaration(node)) {
+    symbol = checker.getSymbolAtLocation(node.name);
+  }
+  if (!symbol && (node as any).name) {
+    symbol = checker.getSymbolAtLocation((node as any).name);
+  }
+  if (symbol) {
+    return checker.getFullyQualifiedName(symbol).replace(/^".*"\./, "");
+  }
+  // Fall back to old strategy
+  return (node as any).name?.getText?.() ?? "anonymous";
 }
 
 function extractInterfaceMetadata(
   node: ts.InterfaceDeclaration,
   typeChecker: ts.TypeChecker,
-  sourceFile: ts.SourceFile
+  sourceFile: ts.SourceFile,
+  context: RTTIExtractContext
 ): RTTIClassMetadata {
-  const fqName = fqNameFromNode(node, sourceFile);
+  const fqName = getCanonicalFqName(node, typeChecker);
 
   // Extract 'extends' (heritage)
   const bases: string[] = [];
@@ -68,71 +76,22 @@ function extractInterfaceMetadata(
     }
   }
 
-  // Extract properties and methods
-  const props: RTTIPropInfo[] = [];
-  for (const member of node.members) {
-    // Properties: PropertySignature
-    if (
-      ts.isPropertySignature(member) &&
-      member.name &&
-      ts.isIdentifier(member.name)
-    ) {
-      const name = member.name.text;
-      const typeObj = member.type
-        ? typeChecker.getTypeFromTypeNode(member.type)
-        : typeChecker.getTypeAtLocation(member);
-      let flags = 0;
-      if ("questionToken" in member && member.questionToken) flags |= 1 << 2; // optional
-
-      const propDecorators: RTTIDecorator[] = [];
-      props.push({
-        name,
-        kind: "property",
-        type: getPrimitive(typeObj),
-        flags,
-        decorators: propDecorators,
-      });
-    }
-    // Methods: MethodSignature
-    if (
-      ts.isMethodSignature(member) &&
-      member.name &&
-      ts.isIdentifier(member.name)
-    ) {
-      const name = member.name.text;
-      const parameters = member.parameters.map((param) => {
-        const pname = param.name.getText(sourceFile);
-        let pType = Primitive.Unknown;
-        if (param.type) {
-          const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-          pType = getPrimitive(typeObj);
-        }
-
-        const paramDecorators: RTTIDecorator[] = [];
-
-        return {
-          name: pname,
-          type: pType,
-          decorators: paramDecorators,
-        };
-      });
-
-      const methodDecorators: RTTIDecorator[] = [];
-      props.push({
-        name,
-        kind: "method",
-        type: Primitive.Unknown, // you may enhance to use method return type if desired
-        flags: 0,
-        decorators: methodDecorators,
-        parameters,
-      });
-    }
-    // (No accessors or constructors in interfaces)
-  }
+  const props: RTTIPropInfo[] = [
+    ...extractNonMethodProps(node.members, typeChecker, sourceFile, context),
+    ...extractMethodGroups(node.members, typeChecker, sourceFile, context),
+  ];
 
   // Generics
-  const generics: string[] = node.typeParameters
-    ? node.typeParameters.map((tp) => tp.name.text)
+  const generics: RTTIGenericParam[] = node.typeParameters
+    ? node.typeParameters.map((tp) => ({
+        name: getCanonicalFqName(tp, typeChecker),
+        constraint: tp.constraint
+          ? extractTypeRTTI(
+              typeChecker.getTypeFromTypeNode(tp.constraint),
+              context
+            )
+          : undefined,
+      }))
     : [];
 
   // Decorators (rare on interfaces, but possible with TS plugin support)
@@ -154,10 +113,10 @@ function extractInterfaceMetadata(
 function extractClassMetadata(
   node: ts.ClassDeclaration,
   typeChecker: ts.TypeChecker,
-  sourceFile: ts.SourceFile
+  sourceFile: ts.SourceFile,
+  context: RTTIExtractContext
 ): RTTIClassMetadata {
-  const fqName = fqNameFromNode(node, sourceFile);
-  const props: RTTIPropInfo[] = [];
+  const fqName = getCanonicalFqName(node, typeChecker);
 
   // Extract Implements
   const bases: string[] = [];
@@ -174,17 +133,259 @@ function extractClassMetadata(
     }
   }
 
-  for (const member of node.members) {
-    // --- Properties ---
-    if (
-      ts.isPropertyDeclaration(member) &&
+  const props: RTTIPropInfo[] = [
+    ...extractNonMethodProps(node.members, typeChecker, sourceFile, context),
+    ...extractMethodGroups(node.members, typeChecker, sourceFile, context),
+  ];
+
+  const generics: RTTIGenericParam[] = node.typeParameters
+    ? node.typeParameters.map((tp) => ({
+        name: getCanonicalFqName(tp, typeChecker),
+        constraint: tp.constraint
+          ? extractTypeRTTI(
+              typeChecker.getTypeFromTypeNode(tp.constraint),
+              context
+            )
+          : undefined,
+      }))
+    : [];
+
+  const decorators: RTTIDecorator[] = [];
+  node.forEachChild((child) => {
+    if (ts.isDecorator(child)) {
+      const decorator = extractDecorator(child, sourceFile);
+      if (decorator) decorators.push(decorator);
+    }
+  });
+  return {
+    fqName,
+    kind: OpCode.REF_CLASS,
+    data: { props, generics, decorators, bases },
+  };
+}
+
+function extractFunctionMetadata(
+  node: ts.FunctionDeclaration,
+  typeChecker: ts.TypeChecker,
+  sourceFile: ts.SourceFile,
+  context: RTTIExtractContext
+): RTTIFunctionMetadata {
+  const fqName = getCanonicalFqName(node, typeChecker);
+  // Parameters
+  const params: RTTIParameter[] = [];
+  node.parameters.forEach((param) => {
+    const paramName = param.name.getText(sourceFile);
+    const paramType = param.type
+      ? typeChecker.getTypeFromTypeNode(param.type)
+      : typeChecker.getTypeAtLocation(param);
+    const typeRef = extractTypeRTTI(paramType, context);
+    const paramDecorators: RTTIDecorator[] = [];
+    params.push({
+      name: paramName,
+      type: typeRef,
+      decorators: paramDecorators,
+    });
+  });
+  // Return type
+  let returnType = node.type
+    ? typeChecker.getTypeFromTypeNode(node.type)
+    : typeChecker.getTypeAtLocation(node);
+  const returnTypeRef = extractTypeRTTI(returnType, context);
+
+  // Generics
+  const generics: RTTIGenericParam[] = node.typeParameters
+    ? node.typeParameters.map((tp) => ({
+        name: getCanonicalFqName(tp, typeChecker),
+        constraint: tp.constraint
+          ? extractTypeRTTI(
+              typeChecker.getTypeFromTypeNode(tp.constraint),
+              context
+            )
+          : undefined,
+      }))
+    : [];
+
+  return {
+    fqName,
+    kind: OpCode.REF_FUNCTION,
+    data: { params, returnType: returnTypeRef, generics },
+  };
+}
+
+function extractEnumMetadata(
+  node: ts.EnumDeclaration,
+  typeChecker: ts.TypeChecker,
+  sourceFile: ts.SourceFile
+): RTTIEnumMetadata {
+  const fqName = getCanonicalFqName(node, typeChecker);
+  const members: { name: string; value: string | number }[] = [];
+  node.members.forEach((member) => {
+    const name = member.name.getText(sourceFile);
+    let value: string | number = members.length;
+    if (member.initializer) {
+      if (ts.isNumericLiteral(member.initializer)) {
+        value = Number(member.initializer.text);
+      } else if (ts.isStringLiteral(member.initializer)) {
+        value = member.initializer.text;
+      } else {
+        value = member.initializer.getText(sourceFile);
+      }
+    }
+    members.push({ name, value });
+  });
+  return {
+    fqName,
+    kind: OpCode.REF_ENUM,
+    data: { members },
+  };
+}
+
+/**
+ * Extracts all methods (including overloads) into a single RTTIPropInfo per method name.
+ */
+function extractMethodGroups(
+  members: ReadonlyArray<ts.ClassElement | ts.TypeElement>,
+  typeChecker: ts.TypeChecker,
+  sourceFile: ts.SourceFile,
+  context: RTTIExtractContext
+): RTTIPropInfo[] {
+  // Group methods by their simple name
+  const methodGroups: Map<
+    string,
+    {
+      flags: number;
+      decorators: RTTIDecorator[];
+      overloads: RTTIMethodOverload[];
+      implementation?: RTTIMethodOverload;
+    }
+  > = new Map();
+
+  for (const member of members) {
+    const isMethod =
+      (ts.isMethodDeclaration(member) || ts.isMethodSignature(member)) &&
       member.name &&
-      ts.isIdentifier(member.name)
+      ts.isIdentifier(member.name);
+
+    if (!isMethod) continue;
+    const name = (member.name as ts.Identifier).text; // SIMPLE name
+
+    // Flags (handle static, etc.)
+    let flags = 0;
+    if (member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword))
+      flags |= 1 << 0;
+    if (member.modifiers?.some((m) => m.kind === ts.SyntaxKind.ReadonlyKeyword))
+      flags |= 1 << 1;
+    if ("questionToken" in member && member.questionToken) flags |= 1 << 2;
+    if (member.modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword))
+      flags |= 1 << 3;
+    else if (
+      member.modifiers?.some((m) => m.kind === ts.SyntaxKind.ProtectedKeyword)
+    )
+      flags |= 1 << 4;
+
+    // Method decorators (for the declaration)
+    const methodDecorators: RTTIDecorator[] = [];
+    member.forEachChild((child) => {
+      if (ts.isDecorator(child)) {
+        const decor = extractDecorator(child, sourceFile);
+        if (decor) methodDecorators.push(decor);
+      }
+    });
+
+    // Parameters (with param-level decorators)
+    const parameters: RTTIParameter[] = (member.parameters ?? []).map(
+      (param) => {
+        const pname = param.name.getText(sourceFile);
+        const pType = param.type
+          ? typeChecker.getTypeFromTypeNode(param.type)
+          : typeChecker.getTypeAtLocation(param);
+        const typeRef = extractTypeRTTI(pType, context);
+        const paramDecorators: RTTIDecorator[] = [];
+        param.forEachChild((child) => {
+          if (ts.isDecorator(child)) {
+            const d = extractDecorator(child, sourceFile);
+            if (d) paramDecorators.push(d);
+          }
+        });
+        return { name: pname, type: typeRef, decorators: paramDecorators };
+      }
+    );
+
+    // Return type
+    const returnType = member.type
+      ? typeChecker.getTypeFromTypeNode(member.type)
+      : typeChecker.getTypeAtLocation(member);
+    const returnTypeRef = extractTypeRTTI(returnType, context);
+
+    // The overload signature for this declaration
+    const overload: RTTIMethodOverload = {
+      params: parameters,
+      returnType: returnTypeRef,
+      decorators: methodDecorators,
+    };
+
+    // Group by name
+    if (!methodGroups.has(name)) {
+      methodGroups.set(name, {
+        flags,
+        decorators: [],
+        overloads: [],
+      });
+    }
+    const g = methodGroups.get(name)!;
+    g.flags |= flags; // combine all flags seen on any overload
+
+    // Save method-level decorators found
+    g.decorators.push(...methodDecorators);
+
+    // Implementation = has a body (class), else signature/overload
+    if (ts.isMethodDeclaration(member) && member.body) {
+      g.implementation = overload; // only ever one implementation
+    } else {
+      g.overloads.push(overload);
+    }
+  }
+
+  // Emit as props
+  const rttiProps: RTTIPropInfo[] = [];
+  for (const [name, group] of methodGroups) {
+    rttiProps.push({
+      name, // SIMPLE name only!
+      kind: "method",
+      // Use implementation returnType for quick reference,
+      // or use the first overload's returnType as fallback.
+      type: group.implementation?.returnType ??
+        group.overloads[0]?.returnType ?? { kind: "primitive", type: 0 },
+      flags: group.flags,
+      decorators: group.decorators,
+      overloads: group.overloads.length > 0 ? group.overloads : undefined,
+      implementation: group.implementation,
+      parameters: group.implementation?.params ?? group.overloads[0]?.params,
+    });
+  }
+  return rttiProps;
+}
+
+/**
+ * Extracts non-method members into RTTIPropInfo: properties, accessors, constructors.
+ */
+export function extractNonMethodProps(
+  members: ReadonlyArray<ts.ClassElement | ts.TypeElement>,
+  typeChecker: ts.TypeChecker,
+  sourceFile: ts.SourceFile,
+  context: RTTIExtractContext
+): RTTIPropInfo[] {
+  const props: RTTIPropInfo[] = [];
+
+  for (const member of members) {
+    // Properties (exclude methods)
+    if (
+      ts.isPropertyDeclaration(member) ||
+      ts.isPropertySignature(member) // for interfaces
     ) {
-      const name = member.name.text;
-      const typeObj = member.type
-        ? typeChecker.getTypeFromTypeNode(member.type)
-        : typeChecker.getTypeAtLocation(member);
+      if (!member.name || !ts.isIdentifier(member.name)) continue;
+      const name = (member.name as ts.Identifier).text;
+
       let flags = 0;
       if (member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword))
         flags |= 1 << 0;
@@ -209,82 +410,28 @@ function extractClassMetadata(
           if (decorator) propDecorators.push(decorator);
         }
       });
+
+      const propType = member.type
+        ? typeChecker.getTypeFromTypeNode(member.type)
+        : typeChecker.getTypeAtLocation(member);
+      const typeRef = extractTypeRTTI(propType, context);
+
       props.push({
         name,
         kind: "property",
-        type: getPrimitive(typeObj),
+        type: typeRef,
         flags,
         decorators: propDecorators,
       });
     }
 
-    // --- Methods ---
-    if (
-      ts.isMethodDeclaration(member) &&
-      member.name &&
-      ts.isIdentifier(member.name)
-    ) {
-      const name = member.name.text;
-      let flags = 0;
-      if (member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword))
-        flags |= 1 << 0;
-      if (
-        member.modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword)
-      )
-        flags |= 1 << 3;
-      else if (
-        member.modifiers?.some((m) => m.kind === ts.SyntaxKind.ProtectedKeyword)
-      )
-        flags |= 1 << 4;
-
-      // Extract method parameters
-      const parameters = member.parameters.map((param) => {
-        const pname = param.name.getText(sourceFile);
-        let pType: PrimitiveType = Primitive.Unknown;
-        if (param.type) {
-          const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-          pType = getPrimitive(typeObj);
-        }
-
-        const parameterDecorators: RTTIDecorator[] = [];
-        param.forEachChild((child) => {
-          if (ts.isDecorator(child)) {
-            const decorator = extractDecorator(child, sourceFile);
-            if (decorator) parameterDecorators.push(decorator);
-          }
-        });
-        return {
-          name: pname,
-          type: pType,
-          decorators: parameterDecorators,
-        };
-      });
-
-      // Special: get return type for methods if required. Here just storing params.
-      const methodDecorators: RTTIDecorator[] = [];
-      member.forEachChild((child) => {
-        if (ts.isDecorator(child)) {
-          const decorator = extractDecorator(child, sourceFile);
-          if (decorator) methodDecorators.push(decorator);
-        }
-      });
-      props.push({
-        name,
-        kind: "method",
-        type: Primitive.Unknown, // Optionally use the actual return type
-        flags,
-        decorators: methodDecorators,
-        parameters,
-      });
-    }
-
-    // --- Accessors (get/set) ---
+    // Accessors (get/set)
     if (
       (ts.isGetAccessor(member) || ts.isSetAccessor(member)) &&
       member.name &&
       ts.isIdentifier(member.name)
     ) {
-      const name = member.name.text;
+      const accessorName = (member.name as ts.Identifier).text;
       let flags = 0;
       if (
         member.modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword)
@@ -295,218 +442,88 @@ function extractClassMetadata(
       )
         flags |= 1 << 4;
 
-      // Accessor params for setters
-      const parameters = member.parameters?.map((param) => {
-        const pname = param.name.getText(sourceFile);
-        let pType = Primitive.Unknown;
-        if (param.type) {
-          const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-          pType = getPrimitive(typeObj);
-        }
+      const parameters: RTTIParameter[] =
+        member.parameters?.map((param) => {
+          const paramName = param.name.getText(sourceFile);
+          const paramType = param.type
+            ? typeChecker.getTypeFromTypeNode(param.type)
+            : typeChecker.getTypeAtLocation(param);
+          const typeRef = extractTypeRTTI(paramType, context);
+          const paramDecorators: RTTIDecorator[] = [];
+          param.forEachChild((child) => {
+            if (ts.isDecorator(child)) {
+              const decorator = extractDecorator(child, sourceFile);
+              if (decorator) paramDecorators.push(decorator);
+            }
+          });
+          return {
+            name: paramName,
+            type: typeRef,
+            decorators: paramDecorators,
+          };
+        }) ?? [];
 
-        const parameterDecorators: RTTIDecorator[] = [];
-        param.forEachChild((child) => {
-          if (ts.isDecorator(child)) {
-            const decorator = extractDecorator(child, sourceFile);
-            if (decorator) parameterDecorators.push(decorator);
-          }
-        });
-        return {
-          name: pname,
-          type: pType,
-          decorators: parameterDecorators,
-        };
-      });
-
-      const propDecorators: RTTIDecorator[] = [];
+      const accessorDecorators: RTTIDecorator[] = [];
       member.forEachChild((child) => {
         if (ts.isDecorator(child)) {
           const decorator = extractDecorator(child, sourceFile);
-          if (decorator) propDecorators.push(decorator);
+          if (decorator) accessorDecorators.push(decorator);
         }
       });
+
+      const accessorType = member.type
+        ? typeChecker.getTypeFromTypeNode(member.type)
+        : typeChecker.getTypeAtLocation(member);
+
+      const typeRef = extractTypeRTTI(accessorType, context);
+
       props.push({
-        name,
+        name: accessorName,
         kind: "accessor",
-        type: Primitive.Unknown,
+        type: typeRef,
         flags,
-        decorators: propDecorators,
+        decorators: accessorDecorators,
         parameters,
       });
     }
 
-    // --- Constructor parameters with decorators ---
+    // Constructors (classes only)
     if (ts.isConstructorDeclaration(member)) {
-      const parameters = member.parameters.map((param) => {
-        const pname = param.name.getText(sourceFile);
-        let pType = Primitive.Unknown;
-        if (param.type) {
-          const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-          pType = getPrimitive(typeObj);
-        }
-
-        const parameterDecorators: RTTIDecorator[] = [];
+      const parameters: RTTIParameter[] = member.parameters.map((param) => {
+        const paramName = param.name.getText(sourceFile);
+        const paramType = param.type
+          ? typeChecker.getTypeFromTypeNode(param.type)
+          : typeChecker.getTypeAtLocation(param);
+        const typeRef = extractTypeRTTI(paramType, context);
+        const paramDecorators: RTTIDecorator[] = [];
         param.forEachChild((child) => {
           if (ts.isDecorator(child)) {
             const decorator = extractDecorator(child, sourceFile);
-            if (decorator) parameterDecorators.push(decorator);
+            if (decorator) paramDecorators.push(decorator);
           }
         });
         return {
-          name: pname,
-          type: pType,
-          decorators: parameterDecorators,
+          name: paramName,
+          type: typeRef,
+          decorators: paramDecorators,
         };
       });
 
       props.push({
         name: "constructor",
         kind: "constructor",
-        type: Primitive.Unknown,
+        type: { kind: "primitive", type: 1 as PrimitiveType }, // e.g. "void"
         flags: 0,
         decorators: [],
         parameters,
       });
-
-      for (const param of member.parameters) {
-        // Check for public/private/protected/readonly etc. modifiers
-        const isParameterProperty = param.modifiers?.some(
-          (m) =>
-            m.kind === ts.SyntaxKind.PrivateKeyword ||
-            m.kind === ts.SyntaxKind.ProtectedKeyword ||
-            m.kind === ts.SyntaxKind.PublicKeyword ||
-            m.kind === ts.SyntaxKind.ReadonlyKeyword
-        );
-        // Only add if not already present (avoid duplicates)
-        const pname = ts.isIdentifier(param.name)
-          ? param.name.text
-          : param.name.getText(sourceFile);
-        if (isParameterProperty && !props.some((p) => p.name === pname)) {
-          let flags = 0;
-          if (
-            param.modifiers?.some(
-              (m) => m.kind === ts.SyntaxKind.PrivateKeyword
-            )
-          )
-            flags |= 1 << 3;
-          else if (
-            param.modifiers?.some(
-              (m) => m.kind === ts.SyntaxKind.ProtectedKeyword
-            )
-          )
-            flags |= 1 << 4;
-          if (
-            param.modifiers?.some(
-              (m) => m.kind === ts.SyntaxKind.ReadonlyKeyword
-            )
-          )
-            flags |= 1 << 1;
-          let pType = Primitive.Unknown;
-          if (param.type) {
-            const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-            pType = getPrimitive(typeObj);
-          }
-
-          const propDecorators: RTTIDecorator[] = [];
-          member.forEachChild((child) => {
-            if (ts.isDecorator(child)) {
-              const decorator = extractDecorator(child, sourceFile);
-              if (decorator) propDecorators.push(decorator);
-            }
-          });
-          props.push({
-            name: pname,
-            kind: "property",
-            type: pType,
-            flags,
-            decorators: propDecorators,
-          });
-        }
-      }
     }
   }
 
-  const generics: string[] = node.typeParameters
-    ? node.typeParameters.map((tp) => tp.name.text)
-    : [];
-
-  const decorators: RTTIDecorator[] = [];
-  node.forEachChild((child) => {
-    if (ts.isDecorator(child)) {
-      const decorator = extractDecorator(child, sourceFile);
-      if (decorator) decorators.push(decorator);
-    }
-  });
-  return {
-    fqName,
-    kind: OpCode.REF_CLASS,
-    data: { props, generics, decorators, bases },
-  };
+  return props;
 }
 
-function extractFunctionMetadata(
-  node: ts.FunctionDeclaration,
-  typeChecker: ts.TypeChecker,
-  sourceFile: ts.SourceFile
-): RTTIFunctionMetadata {
-  const fqName = fqNameFromNode(node, sourceFile);
-  // Parameters
-  const params: RTTIParameter[] = [];
-  node.parameters.forEach((param) => {
-    const name = param.name.getText(sourceFile);
-    let pType = Primitive.Unknown;
-    if (param.type) {
-      const typeObj = typeChecker.getTypeFromTypeNode(param.type);
-      pType = getPrimitive(typeObj);
-    }
-    const paramDecorators: RTTIDecorator[] = [];
-    params.push({ name, type: pType, decorators: paramDecorators });
-  });
-  // Return type
-  let returnType = Primitive.Unknown;
-  if (node.type) {
-    const typeObj = typeChecker.getTypeFromTypeNode(node.type);
-    returnType = getPrimitive(typeObj);
-  }
-  // Generics
-  const generics: string[] = node.typeParameters
-    ? node.typeParameters.map((tp) => tp.name.text)
-    : [];
-
-  return {
-    fqName,
-    kind: OpCode.REF_FUNCTION,
-    data: { params, returnType, generics },
-  };
-}
-
-function extractEnumMetadata(
-  node: ts.EnumDeclaration,
-  sourceFile: ts.SourceFile
-): RTTIEnumMetadata {
-  const fqName = fqNameFromNode(node, sourceFile);
-  const members: { name: string; value: string | number }[] = [];
-  node.members.forEach((member) => {
-    const name = member.name.getText(sourceFile);
-    let value: string | number = members.length;
-    if (member.initializer) {
-      if (ts.isNumericLiteral(member.initializer)) {
-        value = Number(member.initializer.text);
-      } else if (ts.isStringLiteral(member.initializer)) {
-        value = member.initializer.text;
-      } else {
-        value = member.initializer.getText(sourceFile);
-      }
-    }
-    members.push({ name, value });
-  });
-  return {
-    fqName,
-    kind: OpCode.REF_ENUM,
-    data: { members },
-  };
-}
-
+// Patch for extracting a decorator from a node
 function extractDecorator(
   node: ts.Node | undefined,
   sourceFile: ts.SourceFile
@@ -514,16 +531,15 @@ function extractDecorator(
   if (node && ts.isDecorator(node)) {
     let name = "",
       args: string[] = [];
-    const expression = node.expression;
+    const expression = (node as ts.Decorator).expression;
     if (ts.isCallExpression(expression)) {
       name = expression.expression.getText(sourceFile);
       args = expression.arguments.map((arg) => arg.getText(sourceFile));
     } else {
-      name = node.expression.getText(sourceFile);
+      name = expression.getText(sourceFile);
     }
     return { name, args };
   }
-
   return undefined;
 }
 
@@ -555,107 +571,63 @@ async function main(): Promise<void> {
   const program = ts.createProgram(parsed.fileNames, parsed.options);
   const typeChecker = program.getTypeChecker();
 
-  // --- Track RTTI from all sources for final serialization
-  let allTypes: RTTIMetadata[] = [];
+  // === Key Change: shared RTTI context
+  const rttiMap: Map<string, RTTIMetadata> = new Map();
+  const context: RTTIExtractContext = { typeChecker, rttiMap, fqPrefix: "" };
 
-  // --- Gather all source files present this run
-  const presentFiles = new Set<string>();
+  // === Track all fqNames seen from exports/top-levels
+  const exportedFQNames = new Set<string>();
 
   for (const sourceFile of program.getSourceFiles()) {
     if (sourceFile.fileName.includes("node_modules")) continue;
-    presentFiles.add(sourceFile.fileName);
 
     const stat = fs.statSync(sourceFile.fileName);
     const prevFileEntry = cache.files[sourceFile.fileName];
 
-    let typesForThisFile: RTTIMetadata[] = [];
     let typeHashes: Record<string, string> = {};
     ts.forEachChild(sourceFile, (node) => {
       let meta: RTTIMetadata | null = null;
       // === INTERFACE EXTRACTION ===
       if (ts.isInterfaceDeclaration(node) && node.name) {
-        meta = extractInterfaceMetadata(node, typeChecker, sourceFile);
+        meta = extractInterfaceMetadata(node, typeChecker, sourceFile, context);
+        rttiMap.set(meta.fqName, meta);
       }
 
       // === CLASS EXTRACTION ===
       if (ts.isClassDeclaration(node) && node.name) {
-        meta = extractClassMetadata(node, typeChecker, sourceFile);
+        meta = extractClassMetadata(node, typeChecker, sourceFile, context);
+        rttiMap.set(meta.fqName, meta);
       }
 
       // === FUNCTION EXTRACTION ===
       if (ts.isFunctionDeclaration(node) && node.name) {
-        meta = extractFunctionMetadata(node, typeChecker, sourceFile);
+        meta = extractFunctionMetadata(node, typeChecker, sourceFile, context);
+        rttiMap.set(meta.fqName, meta);
       }
 
       // === ENUM EXTRACTION ===
       if (ts.isEnumDeclaration(node)) {
-        meta = extractEnumMetadata(node, sourceFile);
+        meta = extractEnumMetadata(node, typeChecker, sourceFile);
+        rttiMap.set(meta.fqName, meta);
       }
 
-      if (ts.isTypeAliasDeclaration(node)) {
-        // This handles cases like: type Foo = Bar | Baz;
-        if (ts.isUnionTypeNode(node.type)) {
-          // For union in top-level type alias, emit as named union
-          const fqName = fqNameFromNode(node.type.parent, sourceFile);
-          const memberNames: string[] = node.type.types.map((t) =>
-            t.getText(sourceFile)
-          );
-          meta = {
-            fqName,
-            kind: OpCode.REF_UNION,
-            data: { members: memberNames },
-          };
-        }
-        if (ts.isIntersectionTypeNode(node.type)) {
-          const fqName = fqNameFromNode(node.type.parent, sourceFile);
-          const memberNames: string[] = node.type.types.map((t) =>
-            t.getText(sourceFile)
-          );
-          meta = {
-            fqName,
-            kind: OpCode.REF_INTERSECTION,
-            data: { members: memberNames },
-          };
-        }
+      // === TYPE ALIAS EXTRACTION ===
+      if (ts.isTypeAliasDeclaration(node) && node.name) {
+        const fqName = getCanonicalFqName(node, typeChecker);
+        const aliasedType = typeChecker.getTypeFromTypeNode(node.type);
+        const ref = extractTypeRTTI(aliasedType, context);
 
-        if (ts.isMappedTypeNode(node.type)) {
-          const fqName = node.name.text;
-          const typeParameter = node.type.typeParameter;
-          const keyName = typeParameter.name.getText(sourceFile);
-          const keyConstraint =
-            typeParameter.constraint?.getText(sourceFile) ?? ""; // <----- patch!
-          const valueType = node.type.type
-            ? node.type.type.getText(sourceFile)
-            : "";
-
-          meta = {
+        if (ref.kind === "ref") {
+          const realMeta = rttiMap.get(ref.fqName);
+          if (realMeta && fqName !== ref.fqName) {
+            rttiMap.set(fqName, { ...realMeta, fqName });
+          }
+        } else if (ref.kind === "primitive") {
+          rttiMap.set(fqName, {
             fqName,
-            kind: OpCode.REF_MAPPED,
-            data: {
-              keyName,
-              keyConstraint,
-              valueType,
-            },
-          };
-        }
-
-        if (ts.isConditionalTypeNode(node.type)) {
-          const fqName = node.name.text;
-          // Example: type Maybe<T> = T extends string ? string[] : never
-          const checkType = node.type.checkType.getText(sourceFile);
-          const extendsType = node.type.extendsType.getText(sourceFile);
-          const trueType = node.type.trueType.getText(sourceFile);
-          const falseType = node.type.falseType.getText(sourceFile);
-          meta = {
-            fqName,
-            kind: OpCode.REF_CONDITIONAL,
-            data: {
-              checkType,
-              extendsType,
-              trueType,
-              falseType,
-            },
-          };
+            kind: OpCode.REF_PRIMITIVE,
+            data: ref.type,
+          });
         }
       }
 
@@ -667,12 +639,12 @@ async function main(): Promise<void> {
         const cachedType = cache.types[fqName];
         if (cachedType && cachedType.hash === typeHash) {
           // Use cached RTTIMetadata
-          typesForThisFile.push(cachedType.meta);
+          rttiMap.set(fqName, cachedType.meta);
           typeHashes[fqName] = typeHash;
         } else {
           // New/changed type, update global type cache
           cache.types[fqName] = { fqName, hash: typeHash, meta };
-          typesForThisFile.push(meta);
+          rttiMap.set(fqName, meta);
           typeHashes[fqName] = typeHash;
         }
       }
@@ -682,10 +654,10 @@ async function main(): Promise<void> {
     cache.files[sourceFile.fileName] = {
       mtimeMs: stat.mtimeMs,
       typeHashes,
-      types: typesForThisFile,
+      types: Array.from(rttiMap.values()),
     };
-    allTypes.push(...typesForThisFile);
   }
+  const allTypes: RTTIMetadata[] = Array.from(rttiMap.values());
 
   // Prune orphaned types in cache.types (optional, for deleted types)
   const usedTypes = new Set(allTypes.map((t) => t.fqName));

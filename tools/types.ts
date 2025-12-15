@@ -38,99 +38,78 @@ export enum OpCodes {
   REF_LITERAL = 10,
   REF_MAPPED = 11,
   REF_CONDITIONAL = 12,
+  REF_ALIAS = 13,
 }
 
 export type PrimitiveType = Brand<PrimitiveTypeFlag, "PrimitiveType">;
 
+export type RTTITypeRef =
+  | { kind: "primitive"; type: PrimitiveType }
+  | { kind: "ref"; fqName: string };
+
+// --- DECORATOR/GENERIC BASE ---
 export interface RTTIDecorator {
   name: string;
   args: string[];
 }
-
-export interface RTTIProperty {
+export interface RTTIGenericParam {
   name: string;
-  type: PrimitiveType;
+  constraint?: RTTITypeRef;
 }
 
+// --- PARAMS & PROPERTIES ---
 export interface RTTIParameter {
   name: string;
-  type: PrimitiveType; // PrimitiveType | OtherKind
-  decorators: RTTIDecorator[];
-}
-
-export interface RTTIFunction {
-  params: RTTIParameter[];
-  returnType: PrimitiveType;
-  generics?: string[];
-}
-
-export interface RTTIMethodOverload {
-  params: RTTIParameter[];
-  returnType: PrimitiveType;
-  decorators: RTTIDecorator[];
-}
-
-export interface RTTIMethodImplementation {
-  params: RTTIParameter[];
-  returnType: PrimitiveType;
+  type: RTTITypeRef;
   decorators: RTTIDecorator[];
 }
 
 export interface RTTIPropInfo {
   name: string;
-  type: PrimitiveType;
+  type: RTTITypeRef;
   flags: number;
   decorators: RTTIDecorator[];
   kind?: "property" | "method" | "accessor" | "constructor";
   overloads?: RTTIMethodOverload[];
-  implementation?: RTTIMethodImplementation;
+  implementation?: RTTIMethodOverload;
   parameters?: RTTIParameter[];
 }
 
-// For classes and objects
+// --- METHODS (for overloads/impls) ---
+export interface RTTIMethodOverload {
+  params: RTTIParameter[];
+  returnType: RTTITypeRef;
+  decorators: RTTIDecorator[];
+}
+
 export interface RTTIClassMetadata {
   fqName: string;
   kind: OpCodes.REF_CLASS | OpCodes.REF_OBJECT;
   data: {
     props: Array<RTTIPropInfo>;
-    generics: string[];
+    generics: RTTIGenericParam[];
     decorators: RTTIDecorator[];
     bases: string[];
   };
 }
 
-export interface RTTIMethodOverload {
-  params: RTTIParameter[];
-  returnType: PrimitiveType;
-  decorators: RTTIDecorator[];
-}
-
-export interface RTTIClassMethodProp {
-  name: string;
-  kind: "method";
-  type: PrimitiveType; // main implementation's return type (optional)
-  flags: number;
-  overloads: RTTIMethodOverload[];
-  implementation?: RTTIMethodOverload;
-  decorators: RTTIDecorator[];
-  parameters?: RTTIParameter[];
-}
-
-// For functions
 export interface RTTIFunctionMetadata {
   fqName: string;
   kind: OpCodes.REF_FUNCTION;
-  data: RTTIFunction;
+  data: {
+    params: RTTIParameter[];
+    returnType: RTTITypeRef;
+    generics: RTTIGenericParam[];
+    decorators?: RTTIDecorator[];
+  };
 }
 
-// For primitive type
 export interface RTTIPrimitiveMetadata {
   fqName: string;
   kind: OpCodes.REF_PRIMITIVE;
   data: PrimitiveType;
 }
 
-// For enums
 export interface RTTIEnumMetadata {
   fqName: string;
   kind: OpCodes.REF_ENUM;
@@ -139,63 +118,58 @@ export interface RTTIEnumMetadata {
   };
 }
 
-// For unions
 export interface RTTIUnionMetadata {
   fqName: string;
   kind: OpCodes.REF_UNION;
   data: {
-    members: string[];
+    members: RTTITypeRef[];
   };
 }
 
-// For intersections
 export interface RTTIIntersectionMetadata {
   fqName: string;
   kind: OpCodes.REF_INTERSECTION;
   data: {
-    members: string[];
+    members: RTTITypeRef[];
   };
 }
 
-// For mapped types
 export interface RTTIMappedMetadata {
   fqName: string;
   kind: OpCodes.REF_MAPPED;
   data: {
     keyName: string;
-    keyConstraint: string;
-    valueType: string;
+    keyConstraint: RTTITypeRef | null;
+    valueType: RTTITypeRef;
   };
 }
 
-// For conditional types
 export interface RTTIConditionalMetadata {
   fqName: string;
   kind: OpCodes.REF_CONDITIONAL;
   data: {
-    checkType: string;
-    extendsType: string;
-    trueType: string;
-    falseType: string;
+    checkType: RTTITypeRef;
+    extendsType: RTTITypeRef;
+    trueType: RTTITypeRef;
+    falseType: RTTITypeRef;
   };
 }
 
+// ----- Caching -----
 export type TypeCacheEntry = {
   fqName: string;
   hash: string;
   meta: RTTIMetadata;
 };
-
 export type FileCacheEntry = {
   mtimeMs: number;
-  typeHashes: Record<string, string>; // fqName -> hash
+  typeHashes: Record<string, string>;
   types: RTTIMetadata[];
 };
-
 export type MetadataCache = {
   version: number;
   files: Record<string, FileCacheEntry>;
-  types: Record<string, TypeCacheEntry>; // fqName -> { hash, meta }
+  types: Record<string, TypeCacheEntry>;
 };
 
 export type RTTIMetadata =

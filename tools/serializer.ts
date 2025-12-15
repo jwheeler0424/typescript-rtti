@@ -7,10 +7,64 @@ import {
 } from "./protocol";
 import {
   RTTIConditionalMetadata,
+  RTTIDecorator,
   RTTIMappedMetadata,
+  RTTIMetadata,
+  RTTIMethodOverload,
+  RTTITypeRef,
   RTTIUnionMetadata,
-  type RTTIMetadata,
 } from "./types";
+
+// --------- RTTITypeRef Serializer Helper -----------
+function serializeRTTITypeRef(
+  ref: RTTITypeRef,
+  stringTable: StringTable
+): Uint8Array[] {
+  if (ref.kind === "primitive") {
+    return [encodeVarint(0), encodeVarint(ref.type)];
+  } else {
+    return [encodeVarint(1), encodeVarint(stringTable.add(ref.fqName))];
+  }
+}
+
+// ----- Decorator Serializer -----
+function serializeDecoratorList(
+  decos: RTTIDecorator[],
+  stringTable: StringTable
+): Uint8Array[] {
+  const out: Uint8Array[] = [encodeVarint(decos.length)];
+  for (const deco of decos) {
+    const decoNameIdx = stringTable.add(deco.name);
+    out.push(encodeVarint(decoNameIdx));
+    out.push(encodeVarint(deco.args.length));
+    for (const arg of deco.args) {
+      const argIdx = stringTable.add(arg);
+      out.push(encodeVarint(argIdx));
+    }
+  }
+  return out;
+}
+
+// ----- Method Overload Serializer -----
+function serializeMethodOverload(
+  overload: RTTIMethodOverload,
+  stringTable: StringTable
+): Uint8Array[] {
+  const buf: Uint8Array[] = [];
+  // Params
+  buf.push(encodeVarint(overload.params.length));
+  for (const param of overload.params) {
+    const paramNameIdx = stringTable.add(param.name);
+    buf.push(encodeVarint(paramNameIdx));
+    buf.push(...serializeRTTITypeRef(param.type, stringTable));
+    buf.push(...serializeDecoratorList(param.decorators, stringTable));
+  }
+  // Return type
+  buf.push(...serializeRTTITypeRef(overload.returnType, stringTable));
+  // Method-level decorators on this overload (not the main method)
+  buf.push(...serializeDecoratorList(overload.decorators, stringTable));
+  return buf;
+}
 
 function concatUint8Arrays(arrays: Uint8Array[]): Uint8Array {
   const total = arrays.reduce((sum, a) => sum + a.length, 0);
@@ -49,7 +103,6 @@ export class RTTISerializer {
   serializeMetadata(meta: RTTIMetadata): Uint8Array {
     const chunks: Uint8Array[] = [];
     chunks.push(new Uint8Array([meta.kind]));
-
     // Always write fqName string index as varint
     chunks.push(encodeVarint(this.stringTable.getOffset(meta.fqName) ?? 0));
 
@@ -65,7 +118,10 @@ export class RTTISerializer {
       for (const prop of props) {
         const nameIdx = this.stringTable.add(prop.name);
         chunks.push(encodeVarint(nameIdx));
-        chunks.push(encodeVarint(prop.type ?? 0));
+
+        // RTTITypeRef!
+        chunks.push(...serializeRTTITypeRef(prop.type, this.stringTable));
+
         chunks.push(encodeVarint(prop.flags ?? 0));
 
         // Member decorators
@@ -88,7 +144,8 @@ export class RTTISerializer {
           for (const param of prop.parameters) {
             const paramNameIdx = this.stringTable.add(param.name);
             chunks.push(encodeVarint(paramNameIdx));
-            chunks.push(encodeVarint(param.type ?? 0));
+            chunks.push(...serializeRTTITypeRef(param.type, this.stringTable));
+
             const paramDecos: { name: string; args: string[] }[] =
               param.decorators ?? [];
             chunks.push(encodeVarint(paramDecos.length));
@@ -108,11 +165,20 @@ export class RTTISerializer {
       }
 
       // Generics
-      const generics: string[] = (meta.data as any).generics ?? [];
+      const generics: any[] = (meta.data as any).generics ?? [];
       chunks.push(encodeVarint(generics.length));
-      generics.forEach((genericName) => {
-        const nameIdx = this.stringTable.add(genericName);
+      generics.forEach((genericParam) => {
+        const nameIdx = this.stringTable.add(genericParam.name);
         chunks.push(encodeVarint(nameIdx));
+        // Optionally: generic constraint?
+        if (genericParam.constraint) {
+          chunks.push(new Uint8Array([1]));
+          chunks.push(
+            ...serializeRTTITypeRef(genericParam.constraint, this.stringTable)
+          );
+        } else {
+          chunks.push(new Uint8Array([0]));
+        }
       });
 
       // Class/interface-level decorators
@@ -145,7 +211,8 @@ export class RTTISerializer {
       for (const param of params) {
         const nameIdx = this.stringTable.add(param.name);
         chunks.push(encodeVarint(nameIdx));
-        chunks.push(encodeVarint(param.type));
+
+        chunks.push(...serializeRTTITypeRef(param.type, this.stringTable));
 
         const paramDecos: { name: string; args: string[] }[] =
           param.decorators ?? [];
@@ -160,12 +227,22 @@ export class RTTISerializer {
           }
         }
       }
-      chunks.push(encodeVarint(returnType));
+      // Return type
+      chunks.push(...serializeRTTITypeRef(returnType, this.stringTable));
+
       // Generics
       chunks.push(encodeVarint(generics.length));
-      for (const genericName of generics) {
-        const nameIdx = this.stringTable.add(genericName);
+      for (const genericParam of generics) {
+        const nameIdx = this.stringTable.add(genericParam.name);
         chunks.push(encodeVarint(nameIdx));
+        if (genericParam.constraint) {
+          chunks.push(new Uint8Array([1]));
+          chunks.push(
+            ...serializeRTTITypeRef(genericParam.constraint, this.stringTable)
+          );
+        } else {
+          chunks.push(new Uint8Array([0]));
+        }
       }
 
       // Function-level decorators
@@ -191,7 +268,6 @@ export class RTTISerializer {
         const nameIdx = this.stringTable.add(m.name);
         chunks.push(encodeVarint(nameIdx));
         if (typeof m.value === "number") {
-          // Write special tag, then as 4-bytes little-endian
           chunks.push(new Uint8Array([0xff]));
           const valBuf = new Uint8Array(4);
           new DataView(valBuf.buffer).setInt32(0, m.value, true);
@@ -209,30 +285,47 @@ export class RTTISerializer {
       meta.kind === OpCode.REF_UNION ||
       meta.kind === OpCode.REF_INTERSECTION
     ) {
-      const members: string[] =
+      const members: RTTITypeRef[] =
         (meta.data as RTTIUnionMetadata["data"]).members ?? [];
       chunks.push(encodeVarint(members.length));
-      for (const m of members) {
-        const idx = this.stringTable.add(m);
-        chunks.push(encodeVarint(idx));
+      for (const ref of members) {
+        chunks.push(...serializeRTTITypeRef(ref, this.stringTable));
       }
     }
 
     if (meta.kind === OpCode.REF_MAPPED) {
-      const { keyName, valueType } = meta.data as RTTIMappedMetadata["data"];
-      const keyIdx = this.stringTable.add(keyName);
-      const valIdx = this.stringTable.add(valueType);
-      chunks.push(encodeVarint(keyIdx));
-      chunks.push(encodeVarint(valIdx));
+      const { keyName, keyConstraint, valueType } =
+        meta.data as RTTIMappedMetadata["data"];
+      const keyNameIdx = this.stringTable.add(keyName);
+      chunks.push(encodeVarint(keyNameIdx));
+      // keyConstraint RTTITypeRef (maybe null)
+      if (keyConstraint) {
+        chunks.push(new Uint8Array([1]));
+        chunks.push(...serializeRTTITypeRef(keyConstraint, this.stringTable));
+      } else {
+        chunks.push(new Uint8Array([0]));
+      }
+      chunks.push(...serializeRTTITypeRef(valueType, this.stringTable));
     }
 
     if (meta.kind === OpCode.REF_CONDITIONAL) {
       const { checkType, extendsType, trueType, falseType } =
         meta.data as RTTIConditionalMetadata["data"];
-      chunks.push(encodeVarint(this.stringTable.add(checkType)));
-      chunks.push(encodeVarint(this.stringTable.add(extendsType)));
-      chunks.push(encodeVarint(this.stringTable.add(trueType)));
-      chunks.push(encodeVarint(this.stringTable.add(falseType)));
+      chunks.push(...serializeRTTITypeRef(checkType, this.stringTable));
+      chunks.push(...serializeRTTITypeRef(extendsType, this.stringTable));
+      chunks.push(...serializeRTTITypeRef(trueType, this.stringTable));
+      chunks.push(...serializeRTTITypeRef(falseType, this.stringTable));
+    }
+
+    // Optionally, your alias/generic "pointer" nodes
+    if (meta.kind === OpCode.REF_GENERIC && (meta.data as any).base) {
+      const baseIdx = this.stringTable.add((meta.data as any).base);
+      chunks.push(encodeVarint(baseIdx));
+      const args: RTTITypeRef[] = (meta.data as any).args || [];
+      chunks.push(encodeVarint(args.length));
+      for (const arg of args) {
+        chunks.push(...serializeRTTITypeRef(arg, this.stringTable));
+      }
     }
 
     return concatUint8Arrays(chunks);
@@ -254,7 +347,6 @@ export class RTTISerializer {
       indexBuffer.writeUInt32LE(entry.stringOffset, i * 24 + 8);
       indexBuffer.writeUInt32LE(entry.dataOffset, i * 24 + 12);
       indexBuffer.writeUInt32LE(entry.dataLength, i * 24 + 16);
-      // Reserved section remains zeroed
     });
 
     const heapBuffer = concatUint8Arrays(this.heapBuffers);

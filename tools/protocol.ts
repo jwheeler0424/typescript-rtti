@@ -19,6 +19,7 @@ export const OpCode: Record<keyof typeof OpCodes, number> = {
   REF_LITERAL: OpCodes.REF_LITERAL,
   REF_MAPPED: OpCodes.REF_MAPPED,
   REF_CONDITIONAL: OpCodes.REF_CONDITIONAL,
+  REF_ALIAS: OpCodes.REF_ALIAS,
 } as const;
 
 export const Primitive: Record<keyof typeof PrimitiveTypes, PrimitiveType> = {

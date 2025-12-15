@@ -1,15 +1,30 @@
-import { decodeVarint, OpCode } from "./protocol"; // adjust path as needed
+import { decodeVarint, OpCode } from "./protocol";
+import { PrimitiveType, RTTITypeRef } from "./types";
 
-export interface RTTIClassMember {
-  name: string;
-  type: number;
-  flags: number;
-  decorators: { name: string; args: string[] }[];
-  parameters?: {
-    name: string;
-    type: number;
-    decorators: { name: string; args: string[] }[];
-  }[];
+// --- RTTITypeRef decoder helper ---
+function decodeRTTITypeRef(
+  buf: Uint8Array,
+  offset: number,
+  getString: (idx: number) => string
+): { ref: RTTITypeRef; next: number } {
+  const tagDecode = decodeVarint(buf, offset);
+  const tag = tagDecode.value;
+  offset = tagDecode.next;
+  if (tag === 0) {
+    const primDecode = decodeVarint(buf, offset);
+    offset = primDecode.next;
+    return {
+      ref: { kind: "primitive", type: primDecode.value as PrimitiveType },
+      next: offset,
+    };
+  } else {
+    const idxDecode = decodeVarint(buf, offset);
+    offset = idxDecode.next;
+    return {
+      ref: { kind: "ref", fqName: getString(idxDecode.value) },
+      next: offset,
+    };
+  }
 }
 
 export function decodeRTTIEntry(
@@ -26,10 +41,9 @@ export function decodeRTTIEntry(
       const value = decodeVarint(buf, offset).value;
       return { kind: OpCode.REF_PRIMITIVE, type: value };
     }
-
     case OpCode.REF_CLASS:
     case OpCode.REF_OBJECT: {
-      const members: RTTIClassMember[] = [];
+      const members: any[] = [];
       const propCtDecode = decodeVarint(buf, offset);
       let propCount = propCtDecode.value;
       offset = propCtDecode.next;
@@ -37,8 +51,12 @@ export function decodeRTTIEntry(
       for (let i = 0; i < propCount; i++) {
         const nameIdx = decodeVarint(buf, offset).value;
         offset = decodeVarint(buf, offset).next;
-        const typeCode = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
+
+        // RTTITypeRef decode!
+        const typeDecode = decodeRTTITypeRef(buf, offset, getString);
+        const type = typeDecode.ref;
+        offset = typeDecode.next;
+
         const flags = decodeVarint(buf, offset).value;
         offset = decodeVarint(buf, offset).next;
 
@@ -69,8 +87,11 @@ export function decodeRTTIEntry(
           for (let p = 0; p < paramCt; p++) {
             const pnameIdx = decodeVarint(buf, offset).value;
             offset = decodeVarint(buf, offset).next;
-            const ptype = decodeVarint(buf, offset).value;
-            offset = decodeVarint(buf, offset).next;
+
+            const ptypeDecode = decodeRTTITypeRef(buf, offset, getString);
+            const ptype = ptypeDecode.ref;
+            offset = ptypeDecode.next;
+
             const pdecoCt = decodeVarint(buf, offset).value;
             offset = decodeVarint(buf, offset).next;
             const paramDecorators = [];
@@ -96,7 +117,7 @@ export function decodeRTTIEntry(
         }
         members.push({
           name: getString(nameIdx),
-          type: typeCode,
+          type,
           flags,
           decorators,
           parameters,
@@ -107,11 +128,18 @@ export function decodeRTTIEntry(
       const genDecode = decodeVarint(buf, offset);
       const genericsCt = genDecode.value;
       offset = genDecode.next;
-      const generics: string[] = [];
+      const generics: any[] = [];
       for (let i = 0; i < genericsCt; i++) {
         const nameIdx = decodeVarint(buf, offset).value;
         offset = decodeVarint(buf, offset).next;
-        generics.push(getString(nameIdx));
+        let constraint: RTTITypeRef | undefined = undefined;
+        const hasConstraint = buf[offset++];
+        if (hasConstraint) {
+          const cret = decodeRTTITypeRef(buf, offset, getString);
+          constraint = cret.ref;
+          offset = cret.next;
+        }
+        generics.push({ name: getString(nameIdx), constraint });
       }
 
       // Type-level decorators
@@ -150,23 +178,20 @@ export function decodeRTTIEntry(
         bases,
       };
     }
-
     case OpCode.REF_FUNCTION: {
-      // Params
       const paramCtDecode = decodeVarint(buf, offset);
       const paramCt = paramCtDecode.value;
       offset = paramCtDecode.next;
 
-      const params: {
-        name: string;
-        type: number;
-        decorators: { name: string; args: string[] }[];
-      }[] = [];
+      const params: any[] = [];
       for (let i = 0; i < paramCt; i++) {
         const nameIdx = decodeVarint(buf, offset).value;
         offset = decodeVarint(buf, offset).next;
-        const type = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
+
+        const typeRefDec = decodeRTTITypeRef(buf, offset, getString);
+        const type = typeRefDec.ref;
+        offset = typeRefDec.next;
+
         const decoCt = decodeVarint(buf, offset).value;
         offset = decodeVarint(buf, offset).next;
         const decorators: { name: string; args: string[] }[] = [];
@@ -186,20 +211,26 @@ export function decodeRTTIEntry(
         params.push({ name: getString(nameIdx), type, decorators });
       }
       // Return type
-      offset; // currently at next offset after all params
-      const returnTypeDecode = decodeVarint(buf, offset); // FIX: this must advance offset
-      const returnType = returnTypeDecode.value;
-      offset = returnTypeDecode.next;
+      const returnTypeDec = decodeRTTITypeRef(buf, offset, getString);
+      const returnType = returnTypeDec.ref;
+      offset = returnTypeDec.next;
 
       // Generics
       const genDecode = decodeVarint(buf, offset);
       const genCt = genDecode.value;
       offset = genDecode.next;
-      const generics: string[] = [];
+      const generics: any[] = [];
       for (let i = 0; i < genCt; i++) {
-        const idx = decodeVarint(buf, offset).value;
+        const nameIdx = decodeVarint(buf, offset).value;
         offset = decodeVarint(buf, offset).next;
-        generics.push(getString(idx));
+        let constraint: RTTITypeRef | undefined = undefined;
+        const hasConstraint = buf[offset++];
+        if (hasConstraint) {
+          const cret = decodeRTTITypeRef(buf, offset, getString);
+          constraint = cret.ref;
+          offset = cret.next;
+        }
+        generics.push({ name: getString(nameIdx), constraint });
       }
 
       // Function-level decorators
@@ -237,7 +268,6 @@ export function decodeRTTIEntry(
         const nameIdx = decodeVarint(buf, offset).value;
         offset = decodeVarint(buf, offset).next;
         let value: string | number;
-        // Custom protocol: 0xFF (number) OR varint (str len)
         if (buf[offset] === 0xff) {
           value =
             buf[offset + 1] |
@@ -262,11 +292,11 @@ export function decodeRTTIEntry(
       const countDecode = decodeVarint(buf, offset);
       const ct = countDecode.value;
       offset = countDecode.next;
-      const members: string[] = [];
+      const members: RTTITypeRef[] = [];
       for (let i = 0; i < ct; i++) {
-        const idx = decodeVarint(buf, offset).value;
-        offset = decodeVarint(buf, offset).next;
-        members.push(getString(idx));
+        const refDec = decodeRTTITypeRef(buf, offset, getString);
+        members.push(refDec.ref);
+        offset = refDec.next;
       }
       return { kind, members };
     }
@@ -274,31 +304,63 @@ export function decodeRTTIEntry(
     case OpCode.REF_MAPPED: {
       const keyIdx = decodeVarint(buf, offset).value;
       offset = decodeVarint(buf, offset).next;
-      const valIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
+      // keyConstraint:
+      let keyConstraint: RTTITypeRef | null = null;
+      const hasConstraint = buf[offset++];
+      if (hasConstraint) {
+        const cret = decodeRTTITypeRef(buf, offset, getString);
+        keyConstraint = cret.ref;
+        offset = cret.next;
+      }
+      const valueTypeDec = decodeRTTITypeRef(buf, offset, getString);
+      const valueType = valueTypeDec.ref;
+      offset = valueTypeDec.next;
       return {
         kind,
-        keyType: getString(keyIdx),
-        valueType: getString(valIdx),
+        keyName: getString(keyIdx),
+        keyConstraint,
+        valueType,
       };
     }
 
     case OpCode.REF_CONDITIONAL: {
-      const checkIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const extendsIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const trueIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
-      const falseIdx = decodeVarint(buf, offset).value;
-      offset = decodeVarint(buf, offset).next;
+      const checkTypeDec = decodeRTTITypeRef(buf, offset, getString);
+      const checkType = checkTypeDec.ref;
+      offset = checkTypeDec.next;
+
+      const extendsTypeDec = decodeRTTITypeRef(buf, offset, getString);
+      const extendsType = extendsTypeDec.ref;
+      offset = extendsTypeDec.next;
+
+      const trueTypeDec = decodeRTTITypeRef(buf, offset, getString);
+      const trueType = trueTypeDec.ref;
+      offset = trueTypeDec.next;
+
+      const falseTypeDec = decodeRTTITypeRef(buf, offset, getString);
+      const falseType = falseTypeDec.ref;
+      offset = falseTypeDec.next;
+
       return {
         kind,
-        checkType: getString(checkIdx),
-        extendsType: getString(extendsIdx),
-        trueType: getString(trueIdx),
-        falseType: getString(falseIdx),
+        checkType,
+        extendsType,
+        trueType,
+        falseType,
       };
+    }
+
+    case OpCode.REF_GENERIC: {
+      const baseIdx = decodeVarint(buf, offset).value;
+      offset = decodeVarint(buf, offset).next;
+      const argsCt = decodeVarint(buf, offset).value;
+      offset = decodeVarint(buf, offset).next;
+      const args: RTTITypeRef[] = [];
+      for (let i = 0; i < argsCt; i++) {
+        const argDec = decodeRTTITypeRef(buf, offset, getString);
+        args.push(argDec.ref);
+        offset = argDec.next;
+      }
+      return { kind, base: getString(baseIdx), args };
     }
 
     default:

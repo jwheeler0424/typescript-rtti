@@ -65,18 +65,21 @@ _post-compilation_ for advanced automation, validation, and tooling.
 │   ├── User.ts           # Source code: models, functions, etc.
 │   └── index.ts          # Entry point; demonstrates runtime hydration
 ├── /tools
+│   ├── cli.ts            # Inspector/validator CLI (optional but recommended)
 │   ├── compiler.ts       # Build script (see below)
+│   ├── decoder.ts        # Decode serialized metadata
+│   ├── hydrator.ts       # Hydrator/reflection API for runtime use
+│   ├── introspect.ts     # Advanced: query/typescript schema browser API
+│   ├── printer.ts        # Pretty Print functions
 │   ├── protocol.ts       # Protocol definition (constants, opcodes, hash)
-│   └── serializer.ts     # Type/function -> binary serialization logic
-│   └── cli.ts            # Inspector/validator CLI (optional but recommended)
-├── /lib
 │   ├── reader.ts         # MetadataStore: compressed/random-access reader
-│   └── hydrator.ts       # Hydrator/reflection API for runtime use
-│   └── introspect.ts     # Advanced: query/typescript schema browser API
+│   ├── serializer.ts     # Type/function -> binary serialization logic
+│   └── types.ts          # Types to maintain consistency
 ├── tsconfig.json
 ├── package.json
 ├── /dist                # Compiled JS output
 ├── metadata.bin         # Binary sidecar (auto-generated)
+├── metadata.cache       # Binary sidecar cache (auto-generated)
 ```
 
 ---

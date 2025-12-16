@@ -579,7 +579,11 @@ async function main(): Promise<void> {
   const exportedFQNames = new Set<string>();
 
   for (const sourceFile of program.getSourceFiles()) {
-    if (sourceFile.fileName.includes("node_modules")) continue;
+    if (
+      sourceFile.fileName.includes("node_modules") ||
+      sourceFile.fileName.includes("tools")
+    )
+      continue;
 
     const stat = fs.statSync(sourceFile.fileName);
     const prevFileEntry = cache.files[sourceFile.fileName];
@@ -668,7 +672,6 @@ async function main(): Promise<void> {
   // --- Serialize combined RTTI
   const serializer = new RTTISerializer();
   for (const meta of allTypes) {
-    console.log(`SERIALIZE: ${meta.fqName}`, (meta.data as any).generics ?? "");
     serializer.addType(meta);
   }
   const { stringTableBuffer, indexBuffer, heapBuffer } =

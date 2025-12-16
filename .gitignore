@@ -43,5 +43,5 @@ next-env.d.ts
 
 # project files
 /dist
-/metadata.bin
-/metadata.cache
+metadata.bin
+metadata.cache

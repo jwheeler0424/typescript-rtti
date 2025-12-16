@@ -2,7 +2,7 @@
   "version": 1,
   "files": {
     "src/Box.ts": {
-      "mtimeMs": 1765232403303.1616,
+      "mtimeMs": 1765645285289.8406,
       "typeHashes": {
         "Box": "6344501ea91ca306c74c39cba2722eca1289c6bb",
         "wrap": "6265fb403983d59d02c5d2f1a34ae034b1ee23cf"
@@ -103,7 +103,7 @@
       ]
     },
     "src/Demo.ts": {
-      "mtimeMs": 1765497894672.9507,
+      "mtimeMs": 1765645285290.937,
       "typeHashes": {
         "dec": "88362e8c8d4d37ac125669597bcb71e9cec735f0",
         "Demo": "d363243640e8a6ec29249f8aa8dcc0c725acf9a9"
@@ -332,7 +332,7 @@
       ]
     },
     "src/Overloads.ts": {
-      "mtimeMs": 1765498551867.0105,
+      "mtimeMs": 1765645285292.1443,
       "typeHashes": {
         "wrap": "c5221786d2c0d656ed9fa45717a306d5fe9f6341",
         "DemoOverload": "6eb2aa9e8c7611615434da457a67888ca04bbb1a"
@@ -641,7 +641,7 @@
       ]
     },
     "src/Test.ts": {
-      "mtimeMs": 1765838355844.6162,
+      "mtimeMs": 1765866094856.0708,
       "typeHashes": {
         "Role": "9b8666101590896b90619bbe5edcae174fe83c87",
         "Color": "be1b2a6cbdf304e2e07e6799b05dd21f3c01fd7c",
@@ -2283,7 +2283,7 @@
       ]
     },
     "src/TestTypes.ts": {
-      "mtimeMs": 1765317747657.178,
+      "mtimeMs": 1765645285292.6946,
       "typeHashes": {},
       "types": [
         {
@@ -3987,7 +3987,7 @@
       ]
     },
     "src/User.ts": {
-      "mtimeMs": 1765812675407.1892,
+      "mtimeMs": 1765669851917.5579,
       "typeHashes": {
         "entity": "90742e8f320b279b5068d2eb32a08b54c177bf97",
         "field": "3edb4640846b2c043bdfc18a035bd6015ef89a33",
@@ -5721,7 +5721,7 @@
       ]
     },
     "src/index.ts": {
-      "mtimeMs": 1765813678328.1763,
+      "mtimeMs": 1765866094857.073,
       "typeHashes": {},
       "types": [
         {
@@ -7448,7 +7448,7 @@
       ]
     },
     "src/lib/index.ts": {
-      "mtimeMs": 1764970438358.8137,
+      "mtimeMs": 1765645285296.455,
       "typeHashes": {},
       "types": [
         {
